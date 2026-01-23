@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>時間割くん - 教員・クラス時間割リンクシステム</title>
+    <meta name="description" content="教員の時間割とクラスの時間割を連動させる管理システム">
+    <link rel="stylesheet" href="css/style.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 class="app-title">🕐 時間割くん</h1>
+                <div class="history-controls">
+                    <button id="btn-undo" class="btn btn-icon-only" title="元に戻す" disabled>
+                        <span>↶</span>
+                    </button>
+                    <button id="btn-redo" class="btn btn-icon-only" title="やり直す" disabled>
+                        <span>↷</span>
+                    </button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="btn-validation" class="btn btn-secondary" title="時間割チェック">
+                    <span class="btn-icon">🔍</span>チェック
+                </button>
+                <button id="btn-print" class="btn btn-secondary" title="印刷">
+                    <span class="btn-icon">🖨</span>印刷
+                </button>
+                <button id="btn-hamburger" class="btn btn-secondary">
+                    <span class="btn-icon">☰</span>メニュー
+                </button>
+                <div class="hamburger-menu" id="hamburger-menu">
+                    <button id="menu-data" class="menu-item">
+                        <span class="menu-icon">💾</span>保存/読込
+                    </button>
+                    <button id="menu-master" class="menu-item">
+                        <span class="menu-icon">📝</span>マスター編集
+                    </button>
+                    <button id="menu-help" class="menu-item">
+                        <span class="menu-icon">❓</span>使い方
+                    </button>
+                    <button id="menu-patch-notes" class="menu-item">
+                        <span class="menu-icon">📋</span>バージョン情報 (v1.4.1)
+                    </button>
+                </div>
+                <div class="dropdown-menu" id="data-dropdown-menu" style="display: none;">
+                    <div class="dropdown-section">
+                        <div class="dropdown-label">エクスポート</div>
+                        <button id="btn-export-all" class="dropdown-item">📦 すべてエクスポート</button>
+                        <button id="btn-export-master" class="dropdown-item">👤 マスターのみ</button>
+                        <button id="btn-export-timetable" class="dropdown-item">📅 時間割のみ</button>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-section">
+                        <div class="dropdown-label">インポート</div>
+                        <button id="btn-import-file" class="dropdown-item">📥 ファイルからインポート</button>
+                    </div>
+                </div>
+                <input type="file" id="import-file-input" accept=".json" style="display: none;">
+            </div>
+        </header>
+
+        <!-- メインコンテンツ：全教員一括時間割 -->
+        <main class="main-content-overview">
+            <!-- ツールバー -->
+            <div class="overview-toolbar">
+                <div class="toolbar-left">
+                    <h2>📊 全教員時間割一覧</h2>
+                </div>
+                <div class="toolbar-right">
+                    <select id="overview-filter" class="filter-select">
+                        <option value="">すべての教員</option>
+                        <!-- 教員オプションが動的に生成される -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- 一括表示テーブル -->
+            <div class="overview-table-container">
+                <table id="main-overview-table" class="main-overview-table">
+                    <!-- テーブルが動的に生成される -->
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- 授業選択モーダル -->
+    <div id="modal-lesson-select" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">授業を選択</h3>
+                <button class="modal-close" aria-label="閉じる">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="lesson-select-info" class="lesson-info">
+                    <!-- 選択中の時間帯情報 -->
+                </div>
+                <div id="lesson-select-list" class="lesson-list">
+                    <!-- 選択可能な授業一覧（ボタンはJSで動的に生成） -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- マスターデータ編集モーダル -->
+    <div id="modal-master-data" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header">
+                <h3 class="modal-title">📝 マスターデータ編集</h3>
+                <div class="modal-header-actions">
+                    <button id="btn-csv-import-master" class="btn btn-secondary">
+                        <span class="btn-icon">📁</span>CSVインポート/エクスポート
+                    </button>
+                    <button class="modal-close" aria-label="閉じる">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body master-body">
+                <div class="master-tabs">
+                    <button class="master-tab active" data-tab="teachers">👤 教員</button>
+                    <button class="master-tab" data-tab="subjects">📚 教科・科目</button>
+                    <button class="master-tab" data-tab="assignments">📋 担当授業</button>
+                    <button class="master-tab" data-tab="rooms">🏫 特別教室</button>
+                    <button class="master-tab" data-tab="meetings">📅 会議・業務</button>
+                    <button class="master-tab" data-tab="settings">⚙️ 設定</button>
+                </div>
+                <div class="master-content">
+                    <!-- 教員タブ -->
+                    <div id="master-teachers" class="master-pane active">
+                        <div class="master-toolbar">
+                            <h4>教員一覧</h4>
+                            <div style="display: flex; gap: 8px;">
+                                <button id="btn-sort-teachers-by-category" class="btn btn-secondary">📊
+                                    教科順に並び替え</button>
+                                <button id="btn-add-teacher" class="btn btn-accent">+ 教員を追加</button>
+                            </div>
+                        </div>
+                        <div class="card-grid" id="teacher-cards">
+                            <!-- 教員カードが動的に生成される -->
+                        </div>
+                    </div>
+                    <!-- 特別教室タブ -->
+                    <div id="master-rooms" class="master-pane hidden">
+                        <div class="master-toolbar">
+                            <h4>特別教室一覧</h4>
+                            <button id="btn-add-room" class="btn btn-accent">+ 教室を追加</button>
+                        </div>
+                        <div class="card-grid" id="room-cards">
+                            <!-- 特別教室カードが動的に生成される -->
+                        </div>
+                    </div>
+                    <!-- 会議・業務タブ -->
+                    <div id="master-meetings" class="master-pane hidden">
+                        <div class="meeting-layout" style="display: flex; gap: 20px;">
+                            <!-- 左側: 会議・業務登録フォーム（スクロール可能） -->
+                            <div class="meeting-form-panel"
+                                style="flex: 2; max-width: 600px; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                                <h4>会議・業務を登録</h4>
+                                <div class="meeting-form" style="display: flex; flex-direction: column; gap: 16px;">
+                                    <div class="form-group">
+                                        <label
+                                            style="font-size: 1.1em; font-weight: 600; margin-bottom: 8px; display: block;">会議・業務名</label>
+                                        <input type="text" id="meeting-name-input" placeholder="例: 職員会議"
+                                            class="form-control" style="font-size: 1.2em; padding: 12px; width: 100%;">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>参加教員を教科で絞り込み（複数可）</label>
+                                        <div class="tag-container" id="meeting-category-filter-tags">
+                                            <!-- 教科フィルタータグが動的に生成される -->
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                            <label style="margin: 0;">参加教員を選択（複数可）</label>
+                                            <button id="btn-select-all-teachers" class="btn btn-secondary btn-sm"
+                                                style="font-size: 0.85em;">☑️ 全選択</button>
+                                        </div>
+                                        <div class="tag-container" id="meeting-teacher-tags"
+                                            style="max-height: 250px; overflow-y: auto;">
+                                            <!-- 教員タグが動的に生成される -->
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>開催スケジュール</label>
+                                        <div id="meeting-schedule-grid" class="schedule-grid">
+                                            <!-- 勤務不可設定と同様のグリッドが動的に生成される -->
+                                        </div>
+                                    </div>
+
+                                    <div style="display: flex; gap: 8px;">
+                                        <button id="btn-add-meeting" class="btn btn-accent" style="flex: 1;">+
+                                            新規登録</button>
+                                        <button id="btn-update-meeting" class="btn btn-primary"
+                                            style="flex: 1; display: none;">✓ 更新</button>
+                                        <button id="btn-cancel-edit-meeting" class="btn btn-secondary"
+                                            style="display: none;">キャンセル</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 右側: 登録済み会議・業務一覧 -->
+                            <div class="meeting-list-panel" style="flex: 1; max-height: 70vh; overflow-y: auto;">
+                                <div class="master-toolbar">
+                                    <h4>登録済み会議・業務</h4>
+                                    <button id="btn-delete-selected-meetings" class="btn btn-danger btn-sm">🗑️
+                                        選択を削除</button>
+                                </div>
+                                <div class="meeting-cards" id="meeting-cards"
+                                    style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- 会議カードが動的に生成される -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 教科・科目タブ -->
+                    <div id="master-subjects" class="master-pane hidden">
+                        <div class="subject-layout">
+                            <!-- 左: 教科カテゴリ -->
+                            <div class="category-panel">
+                                <div class="master-toolbar">
+                                    <h4>教科</h4>
+                                    <button id="btn-add-category" class="btn btn-accent">+ 教科追加</button>
+                                </div>
+                                <div class="card-list" id="category-cards">
+                                    <!-- 教科カードが動的に生成される -->
+                                </div>
+                            </div>
+                            <!-- 右: 科目 -->
+                            <div class="subject-panel">
+                                <div class="master-toolbar">
+                                    <h4>科目</h4>
+                                    <button id="btn-add-subject" class="btn btn-accent">+ 科目追加</button>
+                                </div>
+                                <div class="card-grid" id="subject-cards">
+                                    <!-- 科目カードが動的に生成される -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 担当授業タブ -->
+                    <div id="master-assignments" class="master-pane hidden">
+                        <div class="assignment-layout">
+                            <!-- 左側：登録フォーム -->
+                            <div class="assignment-form"
+                                style="max-height: 70vh; overflow-y: auto; padding-right: 8px;">
+                                <div class="assignment-section">
+                                    <h4>1. 教員を教科で絞り込み（複数可）</h4>
+                                    <div class="tag-container" id="assignment-filter-category-tags">
+                                        <!-- 教科フィルタータグが動的に生成される -->
+                                    </div>
+                                </div>
+                                <div class="assignment-section">
+                                    <h4>2. 教員を選択（複数可）</h4>
+                                    <div class="tag-container" id="assignment-teacher-tags">
+                                        <!-- 教員タグが動的に生成される -->
+                                    </div>
+                                </div>
+                                <div class="assignment-section">
+                                    <h4>3. 授業担当教科を選択</h4>
+                                    <div class="tag-container" id="assignment-category-tags">
+                                        <!-- 教科タグが動的に生成される -->
+                                    </div>
+                                </div>
+                                <div class="assignment-section">
+                                    <h4>4. 授業科目を選択</h4>
+                                    <div class="tag-container" id="assignment-subject-tags">
+                                        <!-- 科目タグが動的に生成される -->
+                                    </div>
+                                </div>
+                                <div class="assignment-section">
+                                    <h4>5. クラスを選択（複数可）</h4>
+                                    <div class="tag-container" id="assignment-class-tags" style="flex-wrap: wrap;">
+                                        <!-- クラスタグが動的に生成される -->
+                                    </div>
+                                </div>
+                                <div class="assignment-section">
+                                    <h4>6. 週時間数</h4>
+                                    <div class="hours-control"
+                                        style="transform: scale(1.3); transform-origin: left center; margin: 10px 0;">
+                                        <button class="hours-btn" id="btn-hours-dec"
+                                            style="font-size: 1.5em;">−</button>
+                                        <div class="hours-blocks" id="hours-blocks">
+                                            <!-- 時間数ブロックが動的に生成される -->
+                                        </div>
+                                        <button class="hours-btn" id="btn-hours-inc"
+                                            style="font-size: 1.5em;">+</button>
+                                        <span class="hours-label" id="hours-label"
+                                            style="font-size: 1.2em; font-weight: bold;">0/35</span>
+                                    </div>
+                                </div>
+                                <div class="assignment-actions">
+                                    <button id="btn-add-assignment" class="btn btn-primary">担当授業を追加</button>
+                                </div>
+                            </div>
+                            <!-- 右側：登録済みリスト -->
+                            <div class="assignment-list-section">
+                                <div class="assignment-list-header" style="flex-direction: column; gap: 12px;">
+                                    <h4 style="margin: 0;">登録済み担当授業</h4>
+                                    <!-- フィルターグループ -->
+                                    <div class="assignment-filters"
+                                        style="display: flex; flex-direction: column; gap: 16px; padding: 12px; background: var(--color-bg-secondary); border-radius: 8px;">
+
+                                        <!-- グループ1: 教員で絞り込み -->
+                                        <div class="filter-group"
+                                            style="display: flex; flex-direction: column; gap: 8px;">
+                                            <label
+                                                style="font-weight: 600; font-size: 0.9em; color: var(--color-text-primary);">📋
+                                                教員で絞り込み</label>
+                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                                <select id="assignment-filter-teacher-category"
+                                                    class="assignment-filter" style="min-width: 120px;"
+                                                    onchange="ui.masterData.handleTeacherCategoryFilter()">
+                                                    <option value="">すべての教科</option>
+                                                    <!-- 教科オプションが動的に生成される -->
+                                                </select>
+                                                <select id="assignment-filter-teacher" class="assignment-filter"
+                                                    style="min-width: 140px;"
+                                                    onchange="ui.masterData.renderAssignmentList()">
+                                                    <option value="">すべての教員</option>
+                                                    <!-- 教員オプションが動的に生成される -->
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- グループ2: 科目で絞り込み -->
+                                        <div class="filter-group"
+                                            style="display: flex; flex-direction: column; gap: 8px;">
+                                            <label
+                                                style="font-weight: 600; font-size: 0.9em; color: var(--color-text-primary);">📚
+                                                科目で絞り込み</label>
+                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                                <select id="assignment-filter-category-select" class="assignment-filter"
+                                                    style="min-width: 120px;"
+                                                    onchange="ui.masterData.handleSubjectCategoryFilter()">
+                                                    <option value="">すべての教科</option>
+                                                    <!-- 教科オプションが動的に生成される -->
+                                                </select>
+                                                <select id="assignment-filter-subject-select" class="assignment-filter"
+                                                    style="min-width: 140px;"
+                                                    onchange="ui.masterData.renderAssignmentList()">
+                                                    <option value="">すべての科目</option>
+                                                    <!-- 科目オプションが動的に生成される -->
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- グループ3: クラスで絞り込み -->
+                                        <div class="filter-group"
+                                            style="display: flex; flex-direction: column; gap: 8px;">
+                                            <label
+                                                style="font-weight: 600; font-size: 0.9em; color: var(--color-text-primary);">🏫
+                                                クラスで絞り込み</label>
+                                            <select id="assignment-filter-class-select" class="assignment-filter"
+                                                style="min-width: 140px;"
+                                                onchange="ui.masterData.renderAssignmentList()">
+                                                <option value="">すべてのクラス</option>
+                                                <!-- クラスオプションが動的に生成される -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <!-- 一括操作ボタン -->
+                                    <div class="assignment-batch-controls" style="display: flex; gap: 8px;">
+                                        <button id="btn-select-all" class="btn btn-secondary btn-sm"
+                                            onclick="ui.masterData.handleSelectAllAssignments()">
+                                            ☑️ 全選択
+                                        </button>
+                                        <button id="btn-batch-edit" class="btn btn-secondary btn-sm"
+                                            onclick="ui.masterData.handleBatchEdit()">
+                                            ✏️ まとめて時間数を編集
+                                        </button>
+                                        <button id="btn-delete-selected" class="btn btn-danger btn-sm"
+                                            onclick="ui.masterData.handleBatchDelete()">
+                                            🗑️ まとめて削除
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="assignment-list" id="assignment-list"
+                                    style="max-height: 50vh; overflow-y: auto;">
+                                    <!-- 担当授業リストが動的に生成される -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 設定タブ -->
+                    <div id="master-settings" class="master-pane hidden">
+                        <!-- 設定画面が動的に生成される -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-master-reset" class="btn btn-danger" style="margin-right: auto;">全データ削除</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- CSVインポート/エクスポートモーダル -->
+    <div id="modal-csv-unified" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">📥 CSVインポート / エクスポート</h3>
+                <button class="modal-close" aria-label="閉じる">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- タブ -->
+                <div class="csv-tabs"
+                    style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--color-border); padding-bottom: 8px;">
+                    <button class="csv-tab btn active" data-tab="teachers" onclick="ui.csv.switchCSVTab('teachers')">👤
+                        教員</button>
+                    <button class="csv-tab btn" data-tab="subjects" onclick="ui.csv.switchCSVTab('subjects')">📚
+                        教科・科目</button>
+                    <button class="csv-tab btn" data-tab="rooms" onclick="ui.csv.switchCSVTab('rooms')">🏫 特別教室</button>
+                    <button class="csv-tab btn" data-tab="assignments" onclick="ui.csv.switchCSVTab('assignments')">📋
+                        担当授業</button>
+                </div>
+
+                <!-- 教員パネル -->
+                <div id="csv-teachers" class="csv-pane">
+                    <div class="csv-section" style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 12px;">📥 インポート</h4>
+                        <input type="file" id="csv-teachers-file" accept=".csv" class="csv-input">
+                        <p class="csv-hint" style="margin: 8px 0;">
+                            <strong>形式:</strong> 教科,名前<br>
+                            <span style="color: #888;">例: 国語・数学,山田太郎</span><br>
+                            <span style="color: #888;">※教科は「・」や「/」で複数指定可</span>
+                        </p>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button class="btn btn-danger"
+                                onclick="document.getElementById('csv-teachers-file').files[0] && ui.csv.importTeachers(document.getElementById('csv-teachers-file').files[0], true)">
+                                🔄 全て置き換え
+                            </button>
+                            <button class="btn btn-primary"
+                                onclick="document.getElementById('csv-teachers-file').files[0] && ui.csv.importTeachers(document.getElementById('csv-teachers-file').files[0], false)">
+                                ➕ 追加のみ
+                            </button>
+                        </div>
+                        <p class="csv-hint" style="margin-top: 8px; font-size: 0.8em;">
+                            「全て置き換え」: 既存データを削除してインポート<br>
+                            「追加のみ」: 既存データに追加（同名は更新）
+                        </p>
+                        <div id="csv-teachers-status" class="import-status"></div>
+                    </div>
+                    <div class="csv-section">
+                        <h4 style="margin-bottom: 8px;">📤 エクスポート</h4>
+                        <button class="btn btn-secondary" onclick="ui.csv.exportTeachers()">教員一覧をダウンロード</button>
+                    </div>
+                </div>
+
+                <!-- 教科・科目パネル -->
+                <div id="csv-subjects" class="csv-pane hidden">
+                    <div class="csv-section" style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 12px;">📥 インポート</h4>
+                        <input type="file" id="csv-subjects-file" accept=".csv" class="csv-input">
+                        <p class="csv-hint" style="margin: 8px 0;">
+                            <strong>形式:</strong> 教科名,科目名,略称,非表示<br>
+                            <span style="color: #888;">例: 国語,現代文,現文,false</span><br>
+                            <span style="color: #888;">※非表示は true/false</span>
+                        </p>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button class="btn btn-danger"
+                                onclick="document.getElementById('csv-subjects-file').files[0] && ui.csv.importSubjects(document.getElementById('csv-subjects-file').files[0], true)">
+                                🔄 全て置き換え
+                            </button>
+                            <button class="btn btn-primary"
+                                onclick="document.getElementById('csv-subjects-file').files[0] && ui.csv.importSubjects(document.getElementById('csv-subjects-file').files[0], false)">
+                                ➕ 追加のみ
+                            </button>
+                        </div>
+                        <p class="csv-hint" style="margin-top: 8px; font-size: 0.8em;">
+                            「全て置き換え」: 既存データを削除してインポート<br>
+                            「追加のみ」: 既存データに追加（同名は更新）
+                        </p>
+                        <div id="csv-subjects-status" class="import-status"></div>
+                    </div>
+                    <div class="csv-section">
+                        <h4 style="margin-bottom: 8px;">📤 エクスポート</h4>
+                        <button class="btn btn-secondary" onclick="ui.csv.exportSubjects()">教科・科目をダウンロード</button>
+                    </div>
+                </div>
+
+                <!-- 特別教室パネル -->
+                <div id="csv-rooms" class="csv-pane hidden">
+                    <div class="csv-section" style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 12px;">📥 インポート</h4>
+                        <input type="file" id="csv-rooms-file" accept=".csv" class="csv-input">
+                        <p class="csv-hint" style="margin: 8px 0;">
+                            <strong>形式:</strong> 教室名<br>
+                            <span style="color: #888;">例: 理科室</span>
+                        </p>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button class="btn btn-danger"
+                                onclick="document.getElementById('csv-rooms-file').files[0] && ui.csv.importRooms(document.getElementById('csv-rooms-file').files[0], true)">
+                                🔄 全て置き換え
+                            </button>
+                            <button class="btn btn-primary"
+                                onclick="document.getElementById('csv-rooms-file').files[0] && ui.csv.importRooms(document.getElementById('csv-rooms-file').files[0], false)">
+                                ➕ 追加のみ
+                            </button>
+                        </div>
+                        <p class="csv-hint" style="margin-top: 8px; font-size: 0.8em;">
+                            「全て置き換え」: 既存データを削除してインポート<br>
+                            「追加のみ」: 既存データに追加（同名はスキップ）
+                        </p>
+                        <div id="csv-rooms-status" class="import-status"></div>
+                    </div>
+                    <div class="csv-section">
+                        <h4 style="margin-bottom: 8px;">📤 エクスポート</h4>
+                        <button class="btn btn-secondary" onclick="ui.csv.exportRooms()">特別教室をダウンロード</button>
+                    </div>
+                </div>
+
+                <!-- 担当授業パネル -->
+                <div id="csv-assignments" class="csv-pane hidden">
+                    <div class="csv-section" style="margin-bottom: 20px;">
+                        <h4 style="margin-bottom: 12px;">📥 インポート</h4>
+                        <input type="file" id="csv-assignments-file" accept=".csv" class="csv-input">
+                        <p class="csv-hint" style="margin: 8px 0;">
+                            <strong>形式:</strong> 教員名,教科名,科目名,クラス,週時間数<br>
+                            <span style="color: #888;">例: 山田太郎,国語,現代文,1-1,3</span><br>
+                            <span style="color: #888;">※クラスは「・」で複数指定可</span>
+                        </p>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button class="btn btn-danger"
+                                onclick="document.getElementById('csv-assignments-file').files[0] && ui.csv.importAssignments(document.getElementById('csv-assignments-file').files[0], true)">
+                                🔄 全て置き換え
+                            </button>
+                            <button class="btn btn-primary"
+                                onclick="document.getElementById('csv-assignments-file').files[0] && ui.csv.importAssignments(document.getElementById('csv-assignments-file').files[0], false)">
+                                ➕ 追加のみ
+                            </button>
+                        </div>
+                        <p class="csv-hint" style="margin-top: 8px; font-size: 0.8em;">
+                            「全て置き換え」: 既存データを削除してインポート<br>
+                            「追加のみ」: 既存データに追加（重複はスキップ）
+                        </p>
+                        <div id="csv-assignments-status" class="import-status"></div>
+                    </div>
+                    <div class="csv-section">
+                        <h4 style="margin-bottom: 8px;">📤 エクスポート</h4>
+                        <button class="btn btn-secondary" onclick="ui.csv.exportAssignments()">担当授業をダウンロード</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一括表示モーダル -->
+    <div id="modal-overview" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header">
+                <h3 class="modal-title">📊 全教員時間割一覧</h3>
+                <button class="modal-close" aria-label="閉じる">&times;</button>
+            </div>
+            <div class="modal-body overview-body">
+                <div class="overview-container">
+                    <table id="overview-table" class="overview-table">
+                        <!-- 一括表示テーブルがここに生成される -->
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 勤務不可設定モーダル -->
+    <div id="modal-unavailable-settings" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="unavailable-settings-title">勤務不可時間設定</h3>
+                <button class="modal-close" aria-label="閉じる">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">クリックして斜線（勤務不可）を切り替えてください。</p>
+                <div id="unavailable-settings-grid" class="unavailable-settings-grid">
+                    <!-- グリッドはJSで動的生成 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-close btn btn-secondary">キャンセル</button>
+                <button id="btn-save-unavailable" class="btn btn-primary">設定を保存</button>
+            </div>
+        </div>
+    </div>
+    <!-- 右クリックコンテキストメニュー -->
+    <div id="context-menu" class="context-menu hidden">
+        <div class="context-menu-header" id="context-menu-header">授業情報</div>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item" id="ctx-add-to-link">
+            <span class="ctx-icon">🔗</span>連動グループに追加
+        </button>
+        <button class="context-menu-item" id="ctx-create-link">
+            <span class="ctx-icon">➕</span>新規連動グループ作成
+        </button>
+        <button class="context-menu-item" id="ctx-remove-from-link">
+            <span class="ctx-icon">➖</span>連動から外す
+        </button>
+        <div class="context-menu-divider"></div>
+        <button class="context-menu-item ctx-danger" id="ctx-delete">
+            <span class="ctx-icon">🗑️</span>授業を削除
+        </button>
+    </div>
+
+    <!-- 設定・ユーティリティを先に読み込み -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <!-- データ層モジュール -->
+    <script src="js/data/TTLogic.js"></script>
+    <script src="js/data/SlotManager.js"></script>
+    <script src="js/data/Storage.js"></script>
+    <!-- データ・IO -->
+    <script src="js/data.js"></script>
+    <script src="js/io.js"></script>
+    <!-- UI Overview Modules -->
+    <script src="js/ui/overview/TeacherTable.js"></script>
+    <script src="js/ui/overview/ClassTable.js"></script>
+    <script src="js/ui/overview/DragDrop.js"></script>
+    <!-- UI Master Modules -->
+    <script src="js/ui/master/TeacherManager.js"></script>
+    <script src="js/ui/master/SubjectManager.js"></script>
+    <script src="js/ui/master/RoomManager.js"></script>
+    <script src="js/ui/master/MeetingManager.js"></script>
+    <!-- Refactored UI Modules -->
+    <script src="js/ui/overview.js"></script>
+    <script src="js/ui/master_data.js"></script>
+    <script src="js/ui/modal_lesson.js"></script>
+    <script src="js/ui/unavailable_settings.js"></script>
+    <script src="js/ui/csv_manager.js"></script>
+    <script src="js/ui/PrintManager.js"></script>
+    <script src="js/ui/ParkingArea.js"></script>
+    <!-- Validation System -->
+    <script src="js/validation/rules.js"></script>
+    <script src="js/validation/engine.js"></script>
+    <script src="js/ui/ValidationModal.js"></script>
+    <script src="js/ui/index.js"></script>
+    <!-- App Modules -->
+    <script src="js/app/HelpDialog.js"></script>
+    <script src="js/app/PatchNotes.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
