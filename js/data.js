@@ -42,6 +42,9 @@ class DataStore {
         // 手動連動グループ: [{ id, slots: [{classId, day, period}, ...] }]
         this.linkedGroups = [];
 
+        // 選択授業グループ: [{ id, name, color, subjectIds }]
+        this.electiveGroups = [];
+
         // 設定データ
         this.settings = {
             periods: 7,
@@ -184,7 +187,7 @@ class DataStore {
                 }
             });
 
-            const specialClassrooms = localStorage.getItem('timetable_special_classrooms');
+            const specialClassrooms = localStorage.getItem(STORAGE_KEYS.SPECIAL_CLASSROOMS);
             if (specialClassrooms) {
                 try {
                     this.specialClassrooms = JSON.parse(specialClassrooms) || [];
@@ -195,7 +198,7 @@ class DataStore {
             }
 
             // 会議データ読み込み
-            const meetings = localStorage.getItem('timetable_meetings');
+            const meetings = localStorage.getItem(STORAGE_KEYS.MEETINGS);
             if (meetings) {
                 try {
                     this.meetings = JSON.parse(meetings) || [];
@@ -206,12 +209,23 @@ class DataStore {
             }
 
             // 手動連動グループ読み込み
-            if (localStorage.getItem('timetable_linked_groups')) {
-                this.linkedGroups = JSON.parse(localStorage.getItem('timetable_linked_groups'));
+            if (localStorage.getItem(STORAGE_KEYS.LINKED_GROUPS)) {
+                this.linkedGroups = JSON.parse(localStorage.getItem(STORAGE_KEYS.LINKED_GROUPS));
+            }
+
+            // 選択授業グループ読み込み
+            const electiveGroups = localStorage.getItem(STORAGE_KEYS.ELECTIVE_GROUPS);
+            if (electiveGroups) {
+                try {
+                    this.electiveGroups = JSON.parse(electiveGroups) || [];
+                } catch (e) {
+                    console.error('Failed to parse electiveGroups', e);
+                    this.electiveGroups = [];
+                }
             }
 
             // パーキングエリア読み込み
-            const parkingArea = localStorage.getItem('timetable_parking_area');
+            const parkingArea = localStorage.getItem(STORAGE_KEYS.PARKING_AREA);
             if (parkingArea) {
                 try {
                     this.parkingArea = JSON.parse(parkingArea) || {};
@@ -377,12 +391,6 @@ class DataStore {
         return this.settings.unavailableSlots[teacherId].includes(`${day}-${period}`);
     }
 
-    // 全データリセット
-    resetAll() {
-        localStorage.clear();
-        // 設定も初期化されるので、リロードすれば初期設定に戻る
-    }
-
     /**
      * ローカルストレージにデータを保存
      */
@@ -392,14 +400,14 @@ class DataStore {
             localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(this.categories));
             localStorage.setItem(STORAGE_KEYS.SUBJECTS, JSON.stringify(this.subjects));
             localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(this.assignments));
-            localStorage.setItem('timetable_special_classrooms', JSON.stringify(this.specialClassrooms));
-            localStorage.setItem('timetable_meetings', JSON.stringify(this.meetings));
+            localStorage.setItem(STORAGE_KEYS.SPECIAL_CLASSROOMS, JSON.stringify(this.specialClassrooms));
+            localStorage.setItem(STORAGE_KEYS.MEETINGS, JSON.stringify(this.meetings));
             localStorage.setItem(STORAGE_KEYS.TIMETABLE, JSON.stringify(this.timetable));
             localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(this.settings));
             // 手動連動グループも保存
-            localStorage.setItem('timetable_linked_groups', JSON.stringify(this.linkedGroups));
+            localStorage.setItem(STORAGE_KEYS.LINKED_GROUPS, JSON.stringify(this.linkedGroups));
             // パーキングエリアも保存
-            localStorage.setItem('timetable_parking_area', JSON.stringify(this.parkingArea));
+            localStorage.setItem(STORAGE_KEYS.PARKING_AREA, JSON.stringify(this.parkingArea));
             return true;
         } catch (e) {
             console.error('ストレージへの保存エラー:', e);
@@ -434,36 +442,6 @@ class DataStore {
                 }
             }
         });
-    }
-
-    /**
-     * データ構造のマイグレーション
-     * 旧形式（Object/null）の時間割データを新形式（Array）に変換
-     */
-    migrateTimetableData() {
-        if (!this.timetable) return;
-        let modified = false;
-
-        Object.keys(this.timetable).forEach(classId => {
-            const classData = this.timetable[classId];
-            Object.keys(classData).forEach(key => {
-                const slot = classData[key];
-                // nullまたはオブジェクトの場合は配列にラップする
-                if (slot === null) {
-                    classData[key] = [];
-                    modified = true;
-                } else if (!Array.isArray(slot)) {
-                    // 旧形式のデータスロットを配列に変換
-                    classData[key] = [slot];
-                    modified = true;
-                }
-            });
-        });
-
-        if (modified) {
-            console.log('時間割データを配列形式にマイグレーションしました');
-            this.saveToStorage();
-        }
     }
 
     // ══════════════════════════════════════════════════════════
@@ -603,7 +581,7 @@ class DataStore {
         this.electiveGroups.push({ id, name, color, subjectIds });
         this.saveToStorage();
         // 別途保存もしておく（マイグレーション等で消えないように）
-        localStorage.setItem('timetable_elective_groups', JSON.stringify(this.electiveGroups));
+        localStorage.setItem(STORAGE_KEYS.ELECTIVE_GROUPS, JSON.stringify(this.electiveGroups));
         return { success: true };
     }
 
@@ -614,7 +592,7 @@ class DataStore {
             group.color = color;
             group.subjectIds = subjectIds;
             this.saveToStorage();
-            localStorage.setItem('timetable_elective_groups', JSON.stringify(this.electiveGroups));
+            localStorage.setItem(STORAGE_KEYS.ELECTIVE_GROUPS, JSON.stringify(this.electiveGroups));
             return { success: true };
         }
         return { success: false, message: 'グループが見つかりません' };
@@ -625,7 +603,7 @@ class DataStore {
         if (index !== -1) {
             this.electiveGroups.splice(index, 1);
             this.saveToStorage();
-            localStorage.setItem('timetable_elective_groups', JSON.stringify(this.electiveGroups));
+            localStorage.setItem(STORAGE_KEYS.ELECTIVE_GROUPS, JSON.stringify(this.electiveGroups));
             return { success: true };
         }
         return { success: false, message: 'グループが見つかりません' };

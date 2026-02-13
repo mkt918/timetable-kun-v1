@@ -37,8 +37,8 @@ class TeacherManager {
                  style="${backgroundColor}">
                 <div class="card-drag-handle">≡</div>
                 <div class="card-content" style="display: flex; flex-direction: column; gap: 2px;">
-                    <span class="card-name">${teacher.name}</span>
-                    ${categoryNames ? `<span class="card-category" style="font-size: 0.75em; color: #555;">${categoryNames}</span>` : ''}
+                    <span class="card-name">${escapeHtml(teacher.name)}</span>
+                    ${categoryNames ? `<span class="card-category" style="font-size: 0.75em; color: #555;">${escapeHtml(categoryNames)}</span>` : ''}
                 </div>
                 <div class="card-actions">
                     <button class="card-separator ${teacher.separator ? 'active' : ''}" data-id="${teacher.id}" title="右側に区切り線">|</button>
@@ -181,11 +181,11 @@ class TeacherManager {
                 <h3>${isEdit ? '教員を編集' : '教員を追加'}</h3>
                 <div class="form-group">
                     <label>名前 <span style="color: red;">*</span></label>
-                    <input type="text" id="teacher-name" value="${teacher?.name || ''}" placeholder="例: 山田太郎">
+                    <input type="text" id="teacher-name" value="${escapeHtml(teacher?.name || '')}" placeholder="例: 山田太郎">
                 </div>
                 <div class="form-group">
                     <label>短縮名（時間割表示用）</label>
-                    <input type="text" id="teacher-short-name" value="${teacher?.shortName || ''}" placeholder="例: 山田">
+                    <input type="text" id="teacher-short-name" value="${escapeHtml(teacher?.shortName || '')}" placeholder="例: 山田">
                 </div>
                 <div class="form-group">
                     <label>所属教科（複数選択可）</label>
@@ -193,8 +193,8 @@ class TeacherManager {
                         ${this.store.categories.map(cat => {
             const isChecked = teacher?.categoryIds?.includes(cat.id) ? 'checked' : '';
             return `<label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                                <input type="checkbox" class="category-checkbox" value="${cat.id}" ${isChecked}>
-                                ${cat.name}
+                                <input type="checkbox" class="category-checkbox" value="${escapeHtml(cat.id)}" ${isChecked}>
+                                ${escapeHtml(cat.name)}
                             </label>`;
         }).join('')}
                     </div>

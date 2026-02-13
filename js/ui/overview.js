@@ -83,7 +83,7 @@ class OverviewRenderer {
         if (filterSelect) {
             const currentVal = filterSelect.value;
             filterSelect.innerHTML = '<option value="">すべての教員</option>' +
-                this.store.teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+                this.store.teachers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
 
             if (this.mainFilterTeacherId) {
                 filterSelect.value = this.mainFilterTeacherId;
@@ -169,8 +169,8 @@ class OverviewRenderer {
                 lessonDisplay = `${lessonCount}コマ`;
             }
 
-            html += `<th class="${separatorClass}" style="cursor: pointer;" onclick="ui.openUnavailableSettingsModal('${teacher.id}')" title="クリックして勤務不可時間を設定">
-                ${teacher.name} <span style="font-size:0.8em">⚙️</span>
+            html += `<th class="${separatorClass}" style="cursor: pointer;" onclick="ui.openUnavailableSettingsModal('${escapeHtml(teacher.id)}')" title="クリックして勤務不可時間を設定">
+                ${escapeHtml(teacher.name)} <span style="font-size:0.8em">⚙️</span>
                 <div style="font-size: 0.8em; font-weight: normal; color: #666;">${lessonDisplay}</div>
             </th>`;
         });
@@ -202,7 +202,7 @@ class OverviewRenderer {
                     const hasMeeting = meetings.length > 0;
                     const meetingClass = hasMeeting ? 'cell-meeting' : '';
                     if (hasMeeting) {
-                        const meetingNames = meetings.map(m => m.name).join('、');
+                        const meetingNames = meetings.map(m => escapeHtml(m.name)).join('、');
                         titleText = titleText ? `${titleText} / 会議: ${meetingNames}` : `会議: ${meetingNames}`;
                     }
 
@@ -241,7 +241,7 @@ class OverviewRenderer {
 
                         // 会議表示（授業の前に）
                         if (hasMeeting) {
-                            html += `<div class="meeting-indicator" style="font-size: 0.75em; color: #666; margin-bottom: 2px;">${meetings.map(m => m.name).join('、')}</div>`;
+                            html += `<div class="meeting-indicator" style="font-size: 0.75em; color: #666; margin-bottom: 2px;">${meetings.map(m => escapeHtml(m.name)).join('、')}</div>`;
                         }
 
                         // 合同授業（複数クラス）のチェック
@@ -282,8 +282,8 @@ class OverviewRenderer {
 
                             html += `
                                 <div class="cell-content-multi">
-                                    <span class="cell-subject">${linkIndicator}${subjectName}</span>
-                                    <span class="cell-class">${slot.className} ${roomNames}</span>
+                                    <span class="cell-subject">${linkIndicator}${escapeHtml(subjectName)}</span>
+                                    <span class="cell-class">${escapeHtml(slot.className)} ${roomNames}</span>
                                 </div>
                             `;
                         });
@@ -304,7 +304,7 @@ class OverviewRenderer {
 
                         // 会議のみの場合
                         if (hasMeeting) {
-                            html += `<div class="meeting-only" style="font-size: 0.85em; color: #666;">${meetings.map(m => m.name).join('、')}</div>`;
+                            html += `<div class="meeting-only" style="font-size: 0.85em; color: #666;">${meetings.map(m => escapeHtml(m.name)).join('、')}</div>`;
                         }
 
                         html += `</td>
@@ -657,7 +657,7 @@ class OverviewRenderer {
         if (filterSelect) {
             const currentVal = filterSelect.value;
             filterSelect.innerHTML = '<option value="">すべてのクラス</option>' +
-                CLASSES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+                CLASSES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
 
             if (this.mainFilterClassId && filterSelect.querySelector(`option[value="${this.mainFilterClassId}"]`)) {
                 filterSelect.value = this.mainFilterClassId;
@@ -682,7 +682,7 @@ class OverviewRenderer {
         classes.forEach((cls, index) => {
             const isSeparator = index < classes.length - 1 && cls.grade !== classes[index + 1].grade;
             const style = isSeparator ? 'style="border-right: 3px solid #666;"' : '';
-            html += `<th ${style}>${cls.name}</th>`;
+            html += `<th ${style}>${escapeHtml(cls.name)}</th>`;
         });
         html += '</tr></thead><tbody>';
 
@@ -760,14 +760,14 @@ class OverviewRenderer {
                                     return r ? (r.shortName || r.name) : '';
                                 }).filter(n => n);
                                 if (names.length > 0) {
-                                    roomNames = `<span style="font-size:0.8em; color:#007bff;">@${names.join('・')}</span>`;
+                                    roomNames = `<span style="font-size:0.8em; color:#007bff;">@${escapeHtml(names.join('・'))}</span>`;
                                 }
                             }
 
                             html += `
                                 <div class="cell-content-multi">
-                                    <span class="cell-subject">${linkIndicator}${subjectName}</span>
-                                    <span class="cell-class">${teacherNames} ${roomNames}</span>
+                                    <span class="cell-subject">${linkIndicator}${escapeHtml(subjectName)}</span>
+                                    <span class="cell-class">${escapeHtml(teacherNames)} ${roomNames}</span>
                                 </div>
                             `;
                         });
@@ -820,7 +820,7 @@ class OverviewRenderer {
         // ヘッダー行
         let html = '<thead><tr><th class="time-header">時限</th>';
         rooms.forEach(room => {
-            html += `<th>${room.name}</th>`;
+            html += `<th>${escapeHtml(room.name)}</th>`;
         });
         html += '</tr></thead><tbody>';
 
@@ -889,8 +889,8 @@ class OverviewRenderer {
 
                             html += `
                                 <div class="cell-content-multi">
-                                    <span class="cell-subject">${lesson.className}</span>
-                                    <span class="cell-class">${subjectName} / ${teacherNames}</span>
+                                    <span class="cell-subject">${escapeHtml(lesson.className)}</span>
+                                    <span class="cell-class">${escapeHtml(subjectName)} / ${escapeHtml(teacherNames)}</span>
                                 </div>
                             `;
                         });

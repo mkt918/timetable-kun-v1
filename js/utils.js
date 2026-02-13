@@ -63,6 +63,25 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ========================================
+// HTMLエスケープ（XSS対策）
+// ========================================
+
+/**
+ * HTMLエスケープ（XSS対策）
+ * @param {string} str - エスケープする文字列
+ * @returns {string} エスケープされた文字列
+ */
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// ========================================
 // ID生成
 // ========================================
 

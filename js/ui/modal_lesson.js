@@ -38,8 +38,8 @@ class LessonManager {
 
         const roomCheckboxesHtml = rooms.map(r => `
             <label style="display: inline-block; margin-right: 10px; cursor: pointer;">
-                <input type="checkbox" class="room-checkbox" value="${r.id}" ${currentRoomIds.includes(r.id) ? 'checked' : ''}>
-                ${r.name}
+                <input type="checkbox" class="room-checkbox" value="${escapeHtml(r.id)}" ${currentRoomIds.includes(r.id) ? 'checked' : ''}>
+                ${escapeHtml(r.name)}
             </label>
         `).join('');
 
@@ -52,7 +52,7 @@ class LessonManager {
             </div>
         `;
 
-        infoContainer.innerHTML = `<div><strong>${teacher?.name}</strong> - ${DAYS[day]}曜 ${period + 1}限に授業を追加</div>` + roomSelectHtml;
+        infoContainer.innerHTML = `<div><strong>${escapeHtml(teacher?.name)}</strong> - ${DAYS[day]}曜 ${period + 1}限に授業を追加</div>` + roomSelectHtml;
 
         const assignments = this.store.getTeacherAssignments(teacherId);
 
@@ -85,8 +85,8 @@ class LessonManager {
                                data-subject-id="${lesson.subjectId}"
                                ${isPlaced ? 'checked' : ''}
                                style="margin-right: 8px;">
-                        <span class="lesson-subject" style="font-weight: 500;">${subject?.shortName || subject?.name || lesson.subjectId}</span>
-                        <span class="lesson-class" style="margin-left: 8px; color: #666;">${className}</span>${placedBadge}
+                        <span class="lesson-subject" style="font-weight: 500;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
+                        <span class="lesson-class" style="margin-left: 8px; color: #666;">${escapeHtml(className)}</span>${placedBadge}
                         <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="float: right; font-size: 0.9em;">
                             ${hoursText}
                         </span>
@@ -160,8 +160,8 @@ class LessonManager {
         const rooms = this.store.specialClassrooms || [];
         const roomCheckboxesHtml = rooms.map(r => `
             <label style="display: inline-block; margin-right: 10px; cursor: pointer;">
-                <input type="checkbox" class="room-checkbox" value="${r.id}" ${currentRoomIds.includes(r.id) ? 'checked' : ''}>
-                ${r.name}
+                <input type="checkbox" class="room-checkbox" value="${escapeHtml(r.id)}" ${currentRoomIds.includes(r.id) ? 'checked' : ''}>
+                ${escapeHtml(r.name)}
             </label>
         `).join('');
 
@@ -175,7 +175,7 @@ class LessonManager {
             </div>
         `;
 
-        infoContainer.innerHTML = `<div><strong>${teacher?.name}</strong> - ${DAYS[day]}曜 ${period + 1}限 - ${className}</div>` + roomSelectHtml;
+        infoContainer.innerHTML = `<div><strong>${escapeHtml(teacher?.name)}</strong> - ${DAYS[day]}曜 ${period + 1}限 - ${escapeHtml(className)}</div>` + roomSelectHtml;
 
         const assignments = this.store.getTeacherAssignments(teacherId);
 
@@ -213,8 +213,8 @@ class LessonManager {
                                data-subject-id="${lesson.subjectId}"
                                ${isPlaced ? 'checked' : ''}
                                style="margin-right: 8px;">
-                        <span class="lesson-subject" style="font-weight: 500;">${subject?.shortName || subject?.name || lesson.subjectId}</span>
-                        <span class="lesson-class" style="margin-left: 8px; color: #666;">${clsName}</span>${placedBadge}
+                        <span class="lesson-subject" style="font-weight: 500;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
+                        <span class="lesson-class" style="margin-left: 8px; color: #666;">${escapeHtml(clsName)}</span>${placedBadge}
                         <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="float: right; font-size: 0.9em;">
                             ${hoursText}
                         </span>
@@ -645,7 +645,7 @@ class LessonManager {
         const teacherIds = [...new Set(classAssignments.map(a => a.teacherId))];
 
         if (teacherIds.length === 0) {
-            infoContainer.innerHTML = `<div><strong>${className}</strong> - ${DAYS[day]}曜 ${period + 1}限</div>`;
+            infoContainer.innerHTML = `<div><strong>${escapeHtml(className)}</strong> - ${DAYS[day]}曜 ${period + 1}限</div>`;
             listContainer.innerHTML = `
                 <p class="placeholder-text">このクラスを担当する教員がいません。</p>
                 <p class="placeholder-text">マスター編集の「担当授業」タブで登録してください。</p>
@@ -669,8 +669,8 @@ class LessonManager {
 
         const roomCheckboxesHtml = rooms.map(r => `
             <label style="display: inline-block; margin-right: 10px; cursor: pointer;">
-                <input type="checkbox" class="room-checkbox" value="${r.id}" ${currentRoomIds.includes(r.id) ? 'checked' : ''}>
-                ${r.name}
+                <input type="checkbox" class="room-checkbox" value="${escapeHtml(r.id)}" ${currentRoomIds.includes(r.id) ? 'checked' : ''}>
+                ${escapeHtml(r.name)}
             </label>
         `).join('');
 
@@ -683,7 +683,7 @@ class LessonManager {
             </div>
         `;
 
-        infoContainer.innerHTML = `<div><strong>${className}</strong> - ${DAYS[day]}曜 ${period + 1}限に授業を追加</div>` + roomSelectHtml;
+        infoContainer.innerHTML = `<div><strong>${escapeHtml(className)}</strong> - ${DAYS[day]}曜 ${period + 1}限に授業を追加</div>` + roomSelectHtml;
 
         // 担当授業リスト（教員ごと）
         let checkboxListHtml = '';
@@ -715,8 +715,8 @@ class LessonManager {
                                data-subject-id="${lesson.subjectId}"
                                ${isPlaced ? 'checked' : ''}
                                style="margin-right: 8px;">
-                        <span class="lesson-subject" style="font-weight: 500;">${subject?.shortName || subject?.name || lesson.subjectId}</span>
-                        <span style="margin-left: 8px; color: #666;">${teacherName}</span>${placedBadge}
+                        <span class="lesson-subject" style="font-weight: 500;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
+                        <span style="margin-left: 8px; color: #666;">${escapeHtml(teacherName)}</span>${placedBadge}
                         <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="float: right; font-size: 0.9em;">
                             ${hoursText}
                         </span>

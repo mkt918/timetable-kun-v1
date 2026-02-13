@@ -221,17 +221,4 @@ class TimetableUI {
     // I MUST READ THAT PART to ensure no data loss.
 }
 
-// Toast helper (global)
-function showToast(msg, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }, 10);
-}
+// showToast is defined in utils.js

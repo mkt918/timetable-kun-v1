@@ -37,7 +37,21 @@ const STORAGE_KEYS = {
     SUBJECTS: 'timetable_subjects',
     ASSIGNMENTS: 'timetable_assignments',
     TIMETABLE: 'timetable_data',
-    SETTINGS: 'timetable_settings'
+    SETTINGS: 'timetable_settings',
+    SPECIAL_CLASSROOMS: 'timetable_special_classrooms',
+    MEETINGS: 'timetable_meetings',
+    LINKED_GROUPS: 'timetable_linked_groups',
+    PARKING_AREA: 'timetable_parking_area',
+    ELECTIVE_GROUPS: 'timetable_elective_groups'
+};
+
+/**
+ * アプリケーション定数
+ * @constant {Object}
+ */
+const APP_CONSTANTS = {
+    MAX_HISTORY: 5,
+    MAX_PARKING_ITEMS: 20
 };
 
 // ========================================
