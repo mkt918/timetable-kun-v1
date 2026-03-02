@@ -241,6 +241,7 @@ class DragDropHandler {
 
         this.ui.renderMainOverview();
         this.ui.checkConflicts();
+        this.ui.updateUndoRedoButtons();
     }
 
     /**
@@ -337,6 +338,7 @@ class DragDropHandler {
 
         this.ui.renderMainOverview();
         this.ui.checkConflicts();
+        this.ui.updateUndoRedoButtons();
     }
 }
 

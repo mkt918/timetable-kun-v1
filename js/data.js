@@ -65,7 +65,7 @@ class DataStore {
         // Undo/Redo用スタック
         this.undoStack = [];
         this.redoStack = [];
-        this.MAX_HISTORY = 5;
+        this.MAX_HISTORY = APP_CONSTANTS.MAX_HISTORY;
     }
 
     /**
@@ -408,11 +408,50 @@ class DataStore {
             localStorage.setItem(STORAGE_KEYS.LINKED_GROUPS, JSON.stringify(this.linkedGroups));
             // パーキングエリアも保存
             localStorage.setItem(STORAGE_KEYS.PARKING_AREA, JSON.stringify(this.parkingArea));
+
+            // 容量使用率チェック（80%超過で警告）
+            const usageKB = this._getStorageUsageKB();
+            const WARN_THRESHOLD_KB = 4096; // 5MBの約80%
+            if (usageKB > WARN_THRESHOLD_KB) {
+                setTimeout(() => {
+                    showToast(
+                        `ストレージ警告: 保存容量が多くなっています（約${usageKB}KB使用中）。JSONエクスポートでバックアップすることをおすすめします。`,
+                        'warning', 6000
+                    );
+                }, 100);
+            }
             return true;
         } catch (e) {
-            console.error('ストレージへの保存エラー:', e);
+            // LocalStorage 容量超過エラー
+            if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+                const usageKB = this._getStorageUsageKB();
+                setTimeout(() => {
+                    showToast(
+                        `保存エラー: ストレージの容量が不足しています（約${usageKB}KB使用中）。JSONエクスポートでバックアップ後、不要なデータを削除してください。`,
+                        'error', 8000
+                    );
+                }, 100);
+            } else {
+                console.error('ストレージへの保存エラー:', e);
+                setTimeout(() => {
+                    showToast('データの保存に失敗しました', 'error');
+                }, 100);
+            }
             return false;
         }
+    }
+
+    /**
+     * LocalStorageの使用量をKBで返す
+     * @returns {number}
+     */
+    _getStorageUsageKB() {
+        let total = 0;
+        for (const key of Object.values(STORAGE_KEYS)) {
+            const item = localStorage.getItem(key);
+            if (item) total += item.length;
+        }
+        return Math.round(total / 1024);
     }
 
     /**

@@ -30,7 +30,7 @@ class SubjectManager {
                      data-id="${cat.id}"
                      style="background: ${bgColor}; border-left: 4px solid ${bgColor};">
                     <div class="category-info">
-                        <span class="category-name">${cat.name}</span>
+                        <span class="category-name">${escapeHtml(cat.name)}</span>
                         <span class="category-count">(${this.store.subjects.filter(s => s.categoryId === cat.id).length})</span>
                     </div>
                     <div class="category-actions">
@@ -191,8 +191,8 @@ class SubjectManager {
             subjects.forEach(sub => {
                 html += `
                     <div class="subject-item" data-id="${sub.id}">
-                        <span class="subject-name">${sub.name}</span>
-                        <span class="subject-short">(${sub.shortName || sub.name})</span>
+                        <span class="subject-name">${escapeHtml(sub.name)}</span>
+                        <span class="subject-short">(${escapeHtml(sub.shortName || sub.name)})</span>
                         <div class="subject-actions">
                             <button class="btn-edit" data-id="${sub.id}">✏️</button>
                             <button class="btn-delete" data-id="${sub.id}">×</button>

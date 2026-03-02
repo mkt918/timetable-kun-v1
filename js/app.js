@@ -11,7 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ui.init();
     } catch (e) {
         console.error(e);
-        alert('初期化エラーが発生しました: ' + e.message + '\n' + e.stack);
+        // アラートの代わりにHTMLエラーバナーを表示
+        const banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:#fff;padding:16px 24px;z-index:9999;font-size:14px;';
+        banner.innerHTML = `<strong>初期化エラー</strong>: ${escapeHtml(e.message)}<br><small>詳細はブラウザの開発者ツール（F12）でご確認ください。</small>`;
+        document.body.appendChild(banner);
     }
 
     // ==========================================

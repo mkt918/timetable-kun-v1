@@ -26,9 +26,9 @@ class RoomManager {
                 <div class="card-item room-card" data-id="${room.id}" data-index="${index}" draggable="true">
                     <div class="card-drag-handle">≡</div>
                     <div class="card-content">
-                        <span class="card-name">${room.name}</span>
+                        <span class="card-name">${escapeHtml(room.name)}</span>
                         ${room.shortName && room.shortName !== room.name ?
-                    `<span class="card-short-name">(${room.shortName})</span>` : ''}
+                    `<span class="card-short-name">(${escapeHtml(room.shortName)})</span>` : ''}
                     </div>
                     <div class="card-actions">
                         <button class="card-edit" data-id="${room.id}" title="編集">✏️</button>

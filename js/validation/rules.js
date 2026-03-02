@@ -520,5 +520,40 @@ const VALIDATION_RULES = [
                 location: null
             }];
         }
+    },
+
+    // ========== 追加ルール ==========
+
+    {
+        id: 'weekly-hours-over',
+        name: '週授業時間数超過',
+        level: 'warning',
+        enabled: true,
+        check: (store) => {
+            const issues = [];
+
+            store.teachers.forEach(teacher => {
+                const timetable = store.getTeacherTimetable(teacher.id);
+                let placedCount = 0;
+
+                // 実際に配置されているコマ数を数える
+                for (let day = 0; day < DAYS.length; day++) {
+                    for (let period = 0; period < PERIODS; period++) {
+                        const key = `${day}-${period}`;
+                        const slots = timetable[key] || [];
+                        if (slots.length > 0) placedCount++;
+                    }
+                }
+
+                if (placedCount > MAX_WEEKLY_HOURS) {
+                    issues.push({
+                        message: `${teacher.name}: 週授業数が上限超過（${placedCount}コマ / 上限${MAX_WEEKLY_HOURS}コマ）`,
+                        location: { teacherId: teacher.id }
+                    });
+                }
+            });
+
+            return issues;
+        }
     }
 ];

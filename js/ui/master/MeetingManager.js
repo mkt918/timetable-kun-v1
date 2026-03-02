@@ -34,7 +34,7 @@ class MeetingManager {
             const isChecked = this.meetingState.selectedTeacherIds.includes(t.id);
             return `<label style="display: flex; align-items: center; gap: 4px;">
                             <input type="checkbox" class="meeting-teacher-check" value="${t.id}" ${isChecked ? 'checked' : ''}>
-                            ${t.name}
+                            ${escapeHtml(t.name)}
                         </label>`;
         }).join('')}
                 </div>
@@ -202,9 +202,9 @@ class MeetingManager {
             html += `
                 <div class="meeting-item" data-id="${meeting.id}">
                     <div class="meeting-info">
-                        <span class="meeting-name">${meeting.name}</span>
-                        <span class="meeting-teachers" style="font-size: 0.85em; color: #666;">${teacherNames}${moreCount}</span>
-                        <span class="meeting-schedule" style="font-size: 0.85em; color: #888;">${scheduleText}</span>
+                        <span class="meeting-name">${escapeHtml(meeting.name)}</span>
+                        <span class="meeting-teachers" style="font-size: 0.85em; color: #666;">${escapeHtml(teacherNames)}${moreCount}</span>
+                        <span class="meeting-schedule" style="font-size: 0.85em; color: #888;">${escapeHtml(scheduleText)}</span>
                     </div>
                     <div class="meeting-actions">
                         <button class="btn-edit" data-id="${meeting.id}">✏️</button>

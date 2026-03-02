@@ -115,8 +115,8 @@ class MasterDataManager {
                  style="${backgroundColor}">
                 <div class="card-drag-handle">≡</div>
                 <div class="card-content" style="display: flex; flex-direction: column; gap: 2px;">
-                    <span class="card-name">${teacher.name}</span>
-                    ${categoryNames ? `<span class="card-category" style="font-size: 0.75em; color: #555;">${categoryNames}</span>` : ''}
+                    <span class="card-name">${escapeHtml(teacher.name)}</span>
+                    ${categoryNames ? `<span class="card-category" style="font-size: 0.75em; color: #555;">${escapeHtml(categoryNames)}</span>` : ''}
                 </div>
                 <div class="card-actions">
                     <button class="card-separator ${teacher.separator ? 'active' : ''}" data-id="${teacher.id}" title="右側に区切り線">|</button>
@@ -2412,9 +2412,9 @@ class MasterDataManager {
                                ${this.selectedMeetings.has(meeting.id) ? 'checked' : ''}
                                onclick="event.stopPropagation(); ui.masterData.handleMeetingCheck('${meeting.id}')">
                         <div style="flex: 1;">
-                            <div style="font-weight: 600; font-size: 1.1em;">${meeting.name}</div>
-                            <div style="font-size: 0.85em; color: #666; margin-top: 4px;">${teacherNames}</div>
-                            <div style="font-size: 0.85em; color: var(--color-accent-primary); margin-top: 4px;">📅 ${scheduleText}</div>
+                            <div style="font-weight: 600; font-size: 1.1em;">${escapeHtml(meeting.name)}</div>
+                            <div style="font-size: 0.85em; color: #666; margin-top: 4px;">${escapeHtml(teacherNames)}</div>
+                            <div style="font-size: 0.85em; color: var(--color-accent-primary); margin-top: 4px;">📅 ${escapeHtml(scheduleText)}</div>
                         </div>
                         <div style="display: flex; gap: 4px;">
                             <button class="btn-icon-small" title="編集" onclick="event.stopPropagation(); ui.masterData.editMeeting('${meeting.id}')">✏️</button>

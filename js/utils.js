@@ -81,6 +81,18 @@ function escapeHtml(str) {
         .replace(/'/g, '&#39;');
 }
 
+/**
+ * ユーザー向けエラーを表示（トースト + コンソール出力）
+ * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+ * @param {string} context - エラー発生コンテキスト（任意）
+ */
+function showUserError(error, context = '') {
+    const message = error instanceof Error ? error.message : String(error);
+    const displayMsg = context ? `${context}: ${message}` : message;
+    console.error(`[${context || 'エラー'}]`, error);
+    showToast(displayMsg, 'error', 6000);
+}
+
 // ========================================
 // ID生成
 // ========================================

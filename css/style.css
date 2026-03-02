@@ -2,6 +2,29 @@
    時間割くん - スタイルシート
    ========================================== */
 
+/* ローカルフォント定義（オフライン完全動作用） */
+@font-face {
+    font-family: 'Noto Sans JP';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('../fonts/NotoSansJP-Regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Noto Sans JP';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('../fonts/NotoSansJP-Medium.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Noto Sans JP';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('../fonts/NotoSansJP-Bold.woff2') format('woff2');
+}
+
 /* CSS変数 */
 :root {
     /* カラーパレット - ライトテーマ */
@@ -2684,4 +2707,72 @@ body {
 .ctx-icon {
     width: 20px;
     text-align: center;
+}
+
+/* ==========================================
+   モバイル対応（スマートフォン・タブレット）
+   ========================================== */
+
+/* 時間割テーブルの横スクロール対応 */
+.overview-table-container,
+.timetable-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+    /* ヘッダーをコンパクト化 */
+    .app-header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+
+    .app-title {
+        font-size: 1rem;
+    }
+
+    .header-right {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .header-right .btn {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+    }
+
+    /* タブナビゲーション */
+    .tab-nav {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+    }
+
+    .tab-btn {
+        white-space: nowrap;
+        font-size: 0.8rem;
+        padding: 6px 12px;
+    }
+
+    /* モーダルのフルスクリーン化 */
+    .modal-content {
+        width: 95vw;
+        max-width: 95vw;
+        margin: 16px auto;
+        max-height: 85vh;
+    }
+
+    /* テーブルセルを小さく */
+    .timetable-cell {
+        min-width: 60px;
+        font-size: 0.7rem;
+        padding: 4px 2px;
+    }
+
+    /* パーキングエリアを折りたたみ可能に */
+    .parking-panel {
+        min-width: unset;
+        width: 100%;
+    }
 }

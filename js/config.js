@@ -50,7 +50,7 @@ const STORAGE_KEYS = {
  * @constant {Object}
  */
 const APP_CONSTANTS = {
-    MAX_HISTORY: 5,
+    MAX_HISTORY: 20,
     MAX_PARKING_ITEMS: 20
 };
 

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor: コード品質改善（B+ → Aランク）\n\n- セキュリティ: XSS脆弱性修正（escapeHtml関数追加、innerHTML内ユーザー入力のエスケープ）\n- バグ修正: electiveGroupsプロパティの初期化とローカルストレージ読み込み追加\n- 重複コード削除: migrateTimetableData、resetAll、showToastの重複定義を削除\n- 定数化: STORAGE_KEYSにストレージキー追加、APP_CONSTANTS新設\n- CSS修正: 文字化けコメントを正しい日本語に修正\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git -C /c/Program1/時間割くんv2 log --oneline)",
+      "Bash(curl -s \"https://gwfh.mranftl.com/api/fonts/noto-sans-jp\")"
+    ]
+  }
+}
