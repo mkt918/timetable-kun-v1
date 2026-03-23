@@ -120,6 +120,7 @@ class MasterDataManager {
                 </div>
                 <div class="card-actions">
                     <button class="card-separator ${teacher.separator ? 'active' : ''}" data-id="${teacher.id}" title="右側に区切り線">|</button>
+                    <button class="card-assignment" data-id="${teacher.id}" title="担当授業を設定">📚</button>
                     <button class="card-edit" data-id="${teacher.id}" title="編集">✏️</button>
                     <button class="card-delete" data-id="${teacher.id}" title="削除">×</button>
                 </div>
@@ -227,6 +228,14 @@ class MasterDataManager {
                     this.store.saveToStorage();
                     this.renderTeachers();
                 }
+            };
+        });
+
+        // 担当授業ボタン
+        container.querySelectorAll('.card-assignment').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                this.ui.openTeacherAssignmentModal(e.target.dataset.id);
             };
         });
 
