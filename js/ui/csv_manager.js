@@ -122,7 +122,7 @@ class CSVManager {
     // 教科・科目 CSV
     // ============================================
     exportSubjects() {
-        const rows = [['教科名', '科目名', '略称', '単位数', '非表示']];
+        const rows = [['教科名', '科目名', '略称', '単位数', '学年', 'クラス', '非表示']];
         this.store.subjects.forEach(s => {
             const category = this.store.getCategory(s.categoryId);
             rows.push([
@@ -130,6 +130,8 @@ class CSVManager {
                 s.name,
                 s.shortName || '',
                 s.credits || 1,
+                s.grade || '',
+                s.targetClass || '',
                 s.isHidden ? 'true' : 'false'
             ]);
         });
@@ -153,7 +155,7 @@ class CSVManager {
                 let count = 0;
 
                 // ヘッダー行をスキップ
-                // 形式: 教科名,科目名,略称,単位数,非表示
+                // 形式: 教科名,科目名,略称,単位数,学年,クラス,非表示
                 const firstLine = lines[0].trim();
                 const startIndex = firstLine.startsWith('教科名') ? 1 : 0;
 
@@ -162,11 +164,13 @@ class CSVManager {
                     if (!line) continue;
 
                     const cols = this.parseCSVLine(line);
-                    const categoryName = cols[0]?.trim();
-                    const subjectName = cols[1]?.trim();
-                    const shortName = cols[2]?.trim() || subjectName?.slice(0, 4);
-                    const credits = parseInt(cols[3]?.trim()) || 1;
-                    const isHidden = cols[4]?.trim().toLowerCase() === 'true';
+                    const categoryName  = cols[0]?.trim();
+                    const subjectName   = cols[1]?.trim();
+                    const shortName     = cols[2]?.trim() || subjectName?.slice(0, 4);
+                    const credits       = parseInt(cols[3]?.trim()) || 1;
+                    const grade         = cols[4]?.trim() || '';
+                    const targetClass   = cols[5]?.trim() || '';
+                    const isHidden      = cols[6]?.trim().toLowerCase() === 'true';
 
                     if (!categoryName || !subjectName) continue;
 
@@ -183,12 +187,7 @@ class CSVManager {
                         s => s.name === subjectName && s.categoryId === category.id
                     );
                     if (!existing) {
-                        this.store.addSubject(`s_${Date.now()}_${i}`, category.id, subjectName, shortName, credits);
-                        // isHidden設定
-                        if (isHidden) {
-                            const newSubject = this.store.subjects[this.store.subjects.length - 1];
-                            this.store.updateSubject(newSubject.id, { isHidden: true });
-                        }
+                        this.store.addSubject(`s_${Date.now()}_${i}`, category.id, subjectName, shortName, credits, grade, targetClass, isHidden);
                         count++;
                     }
                 }

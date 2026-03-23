@@ -1171,15 +1171,25 @@ class OverviewRenderer {
             }).join('');
         };
 
-        // ── クラスタグ ──
+        // ── クラスタグ（科目の学年・クラス属性でフィルタ） ──
         const renderClassPanel = () => {
             if (!selectedSubjectId) return '<p style="color:#aaa; font-size:0.9em;">← 科目を選択してください</p>';
             const sub = this.store.getSubject(selectedSubjectId);
             if (!sub) return '';
+
+            // 科目の学年・クラス属性で表示クラスを絞り込む
+            let filteredClasses = CLASSES;
+            if (sub.targetClass) {
+                filteredClasses = CLASSES.filter(c => c.id === sub.targetClass);
+            } else if (sub.grade) {
+                filteredClasses = CLASSES.filter(c => String(c.grade) === String(sub.grade));
+            }
+
             const assignedClassIds = new Set(
                 this.store.assignments.filter(a => a.teacherId === teacherId && a.subjectId === selectedSubjectId).map(a => a.classId)
             );
-            const tags = CLASSES.map(c => {
+            const filterNote = sub.targetClass ? '（クラス指定）' : sub.grade ? `（${sub.grade}年生対象）` : '';
+            const tags = filteredClasses.map(c => {
                 const isActive = assignedClassIds.has(c.id);
                 return `
                     <span class="asgn-class-tag" data-class-id="${escapeHtml(c.id)}"
@@ -1193,9 +1203,9 @@ class OverviewRenderer {
             }).join('');
             return `
                 <div style="font-size:0.85em; color:#555; margin-bottom:8px;">
-                    <strong>${escapeHtml(sub.name)}</strong>（${sub.credits || 1}単位/週）のクラスをクリックで担当設定:
+                    <strong>${escapeHtml(sub.name)}</strong>（${sub.credits || 1}単位/週）${escapeHtml(filterNote)} のクラスをクリックで担当設定:
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">${tags}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">${tags || '<span style="color:#aaa;">対象クラスがありません</span>'}</div>
             `;
         };
 

@@ -571,18 +571,24 @@ class DataStore {
     // 科目管理（現代文、古典など）
     // ==========================================
 
-    addSubject(id, categoryId, name, shortName, credits = 1, isHidden = false) {
+    addSubject(id, categoryId, name, shortName, credits = 1, grade = '', targetClass = '', isHidden = false) {
         if (this.subjects.find(s => s.id === id)) {
             return { success: false, message: '同じIDの科目が存在します' };
         }
-        this.subjects.push({ id, categoryId, name, shortName: shortName || name, credits: parseInt(credits) || 1, isHidden });
+        this.subjects.push({
+            id, categoryId, name, shortName: shortName || name,
+            credits: parseInt(credits) || 1,
+            grade: grade ? String(grade) : '',        // 対象学年（空白=全学年）
+            targetClass: targetClass || '',            // 対象クラスID（空白=全クラス）
+            isHidden
+        });
         this.saveToStorage();
         return { success: true };
     }
 
     /**
      * 科目を更新する。
-     * オブジェクト形式: updateSubject(id, { name, shortName, categoryId, isHidden, credits })
+     * オブジェクト形式: updateSubject(id, { name, shortName, categoryId, credits, grade, targetClass, isHidden })
      * 個別引数形式（後方互換）: updateSubject(id, name, shortName, categoryId, isHidden)
      * creditsが変更された場合、関連する担当授業のweeklyHoursも自動更新（完全連動）
      */
@@ -591,13 +597,14 @@ class DataStore {
         if (!subject) return { success: false, message: '科目が見つかりません' };
 
         if (typeof nameOrData === 'object' && nameOrData !== null) {
-            // オブジェクト形式: { name, shortName, categoryId, isHidden, credits }
             const data = nameOrData;
             const oldCredits = subject.credits || 1;
             if (data.name !== undefined) subject.name = data.name;
             if (data.shortName !== undefined) subject.shortName = data.shortName || subject.name;
             if (data.categoryId !== undefined) subject.categoryId = data.categoryId;
             if (data.isHidden !== undefined) subject.isHidden = data.isHidden;
+            if (data.grade !== undefined) subject.grade = data.grade ? String(data.grade) : '';
+            if (data.targetClass !== undefined) subject.targetClass = data.targetClass || '';
             if (data.credits !== undefined) {
                 const newCredits = parseInt(data.credits) || 1;
                 subject.credits = newCredits;

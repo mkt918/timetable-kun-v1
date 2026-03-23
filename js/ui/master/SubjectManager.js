@@ -181,21 +181,26 @@ class SubjectManager {
         if (subjects.length === 0) {
             container.innerHTML = `
                 <p class="placeholder-text">この教科に科目がありません</p>
-                <div style="margin-top: 16px; display:flex; gap:8px; align-items:center;">
-                    <input type="text" id="new-subject-name" placeholder="新しい科目名" style="flex:1;">
-                    <input type="number" id="new-subject-credits" min="1" max="20" value="1" style="width:60px;" title="単位数">
-                    <span style="font-size:0.85em; color:#666;">単位</span>
-                    <button id="btn-add-subject" class="btn btn-primary">追加</button>
-                </div>
+                ${this._subjectAddFormHtml()}
             `;
         } else {
             let html = '<div class="subject-items">';
             subjects.forEach(sub => {
+                // 学年・クラスのバッジ表示
+                let targetBadge = '';
+                if (sub.grade || sub.targetClass) {
+                    const gradeLabel = sub.grade ? `${sub.grade}年` : '';
+                    const clsObj = sub.targetClass ? CLASSES.find(c => c.id === sub.targetClass) : null;
+                    const clsLabel = clsObj ? clsObj.name : (sub.targetClass || '');
+                    const label = [gradeLabel, clsLabel].filter(Boolean).join(' / ');
+                    targetBadge = `<span style="font-size:0.78em; background:#e0f0ff; color:#2563eb; border-radius:10px; padding:1px 7px; margin-left:6px;">${escapeHtml(label)}</span>`;
+                }
                 html += `
                     <div class="subject-item" data-id="${sub.id}">
                         <span class="subject-name">${escapeHtml(sub.name)}</span>
                         <span class="subject-short">(${escapeHtml(sub.shortName || sub.name)})</span>
                         <span class="subject-credits" style="font-size:0.85em; color:#666; margin-left:6px;">${sub.credits || 1}単位</span>
+                        ${targetBadge}
                         <div class="subject-actions">
                             <button class="btn-edit" data-id="${sub.id}">✏️</button>
                             <button class="btn-delete" data-id="${sub.id}">×</button>
@@ -204,39 +209,40 @@ class SubjectManager {
                 `;
             });
             html += '</div>';
-            html += `
-                <div style="margin-top: 16px; display:flex; gap:8px; align-items:center;">
-                    <input type="text" id="new-subject-name" placeholder="新しい科目名" style="flex:1;">
-                    <input type="number" id="new-subject-credits" min="1" max="20" value="1" style="width:60px;" title="単位数">
-                    <span style="font-size:0.85em; color:#666;">単位</span>
-                    <button id="btn-add-subject" class="btn btn-primary">追加</button>
-                </div>
-            `;
+            html += this._subjectAddFormHtml();
             container.innerHTML = html;
         }
 
         this.attachSubjectEvents(container, catId);
     }
 
+    /** 追加フォームのHTMLを生成 */
+    _subjectAddFormHtml() {
+        const gradeOptions = ['', '1', '2', '3'].map(g =>
+            `<option value="${g}">${g ? g + '年' : '全学年'}</option>`
+        ).join('');
+        const classOptions = ['<option value="">全クラス</option>'].concat(
+            CLASSES.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`)
+        ).join('');
+        return `
+            <div style="margin-top:16px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="new-subject-name" placeholder="科目名" style="flex:1; min-width:100px;">
+                <input type="number" id="new-subject-credits" min="1" max="20" value="1" style="width:52px;" title="単位数">
+                <span style="font-size:0.82em; color:#666;">単位</span>
+                <select id="new-subject-grade" style="width:72px;" title="学年">${gradeOptions}</select>
+                <select id="new-subject-class" style="width:90px;" title="クラス">${classOptions}</select>
+                <button id="btn-add-subject" class="btn btn-primary">追加</button>
+            </div>
+        `;
+    }
+
     attachSubjectEvents(container, catId) {
-        // 編集
+        // 編集（ダイアログ形式）
         container.querySelectorAll('.btn-edit').forEach(btn => {
             btn.onclick = () => {
                 const sub = this.store.getSubject(btn.dataset.id);
-                if (sub) {
-                    const newName = prompt('科目名を編集', sub.name);
-                    if (newName && newName.trim()) {
-                        const shortName = prompt('短縮名を編集', sub.shortName || newName.trim());
-                        const creditsInput = prompt('単位数を編集', sub.credits || 1);
-                        const credits = parseInt(creditsInput) || (sub.credits || 1);
-                        this.store.updateSubject(btn.dataset.id, {
-                            name: newName.trim(),
-                            shortName: shortName?.trim() || newName.trim(),
-                            credits
-                        });
-                        this.render(catId);
-                    }
-                }
+                if (!sub) return;
+                this._openEditDialog(sub, catId);
             };
         });
 
@@ -256,21 +262,90 @@ class SubjectManager {
         const addBtn = document.getElementById('btn-add-subject');
         if (addBtn) {
             addBtn.onclick = () => {
-                const input = document.getElementById('new-subject-name');
-                const creditsInput = document.getElementById('new-subject-credits');
-                const name = input.value.trim();
-                const credits = parseInt(creditsInput?.value) || 1;
+                const nameEl    = document.getElementById('new-subject-name');
+                const creditsEl = document.getElementById('new-subject-credits');
+                const gradeEl   = document.getElementById('new-subject-grade');
+                const classEl   = document.getElementById('new-subject-class');
+                const name = nameEl.value.trim();
+                const credits = parseInt(creditsEl?.value) || 1;
+                const grade = gradeEl?.value || '';
+                const targetClass = classEl?.value || '';
                 if (name && catId) {
-                    this.store.addSubject(`sub_${Date.now()}`, catId, name, name, credits);
+                    this.store.addSubject(`sub_${Date.now()}`, catId, name, name, credits, grade, targetClass);
                     this.render(catId);
-                    input.value = '';
-                    if (creditsInput) creditsInput.value = '1';
+                    nameEl.value = '';
+                    if (creditsEl) creditsEl.value = '1';
+                    if (gradeEl) gradeEl.value = '';
+                    if (classEl) classEl.value = '';
                     showToast('追加しました', 'success');
                 }
             };
         }
     }
+
+    /** 科目編集ダイアログをモーダルで表示 */
+    _openEditDialog(sub, catId) {
+        const existing = document.querySelector('.subject-edit-overlay');
+        if (existing) existing.remove();
+
+        const gradeOptions = ['', '1', '2', '3'].map(g =>
+            `<option value="${g}" ${sub.grade === g ? 'selected' : ''}>${g ? g + '年' : '全学年'}</option>`
+        ).join('');
+        const classOptions = ['<option value="">全クラス</option>'].concat(
+            CLASSES.map(c => `<option value="${escapeHtml(c.id)}" ${sub.targetClass === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`)
+        ).join('');
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay subject-edit-overlay';
+        overlay.innerHTML = `
+            <div class="dialog-content" style="width:380px;">
+                <h3 style="margin-bottom:16px;">科目を編集</h3>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:70px; font-size:0.88em;">科目名</label>
+                        <input id="edit-sub-name" type="text" value="${escapeHtml(sub.name)}" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:70px; font-size:0.88em;">略称</label>
+                        <input id="edit-sub-short" type="text" value="${escapeHtml(sub.shortName || sub.name)}" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:70px; font-size:0.88em;">単位数</label>
+                        <input id="edit-sub-credits" type="number" min="1" max="20" value="${sub.credits || 1}" style="width:60px;">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:70px; font-size:0.88em;">学年</label>
+                        <select id="edit-sub-grade" style="flex:1;">${gradeOptions}</select>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:70px; font-size:0.88em;">クラス</label>
+                        <select id="edit-sub-class" style="flex:1;">${classOptions}</select>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top:16px;">
+                    <button class="btn btn-secondary" id="btn-edit-sub-cancel">キャンセル</button>
+                    <button class="btn btn-primary" id="btn-edit-sub-save">保存</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#btn-edit-sub-save').onclick = () => {
+            const name  = overlay.querySelector('#edit-sub-name').value.trim();
+            const short = overlay.querySelector('#edit-sub-short').value.trim();
+            const cred  = parseInt(overlay.querySelector('#edit-sub-credits').value) || 1;
+            const grade = overlay.querySelector('#edit-sub-grade').value;
+            const tCls  = overlay.querySelector('#edit-sub-class').value;
+            if (!name) return;
+            this.store.updateSubject(sub.id, { name, shortName: short || name, credits: cred, grade, targetClass: tCls });
+            this.render(catId);
+            overlay.remove();
+        };
+        overlay.querySelector('#btn-edit-sub-cancel').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    }
 }
+
 
 // グローバルに公開
 window.SubjectManager = SubjectManager;
