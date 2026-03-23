@@ -1280,9 +1280,22 @@ class OverviewRenderer {
                         a => a.teacherId === teacherId && a.subjectId === selectedSubjectId && a.classId === classId
                     );
                     if (existing) {
+                        // 担当削除 → 時間割からも除去
+                        this._removePlacedLessons(classId, teacherId, selectedSubjectId);
                         this.store.deleteAssignment(teacherId, selectedSubjectId, classId);
+                        showToast('担当と時間割配置を削除しました', 'success');
                     } else {
-                        this.store.addAssignment(teacherId, selectedSubjectId, classId, sub ? (sub.credits || 1) : 1);
+                        // 担当追加 → 時間割に自動配置
+                        const wh = sub ? (sub.credits || 1) : 1;
+                        this.store.addAssignment(teacherId, selectedSubjectId, classId, wh);
+                        const result = this._autoPlaceLessons(classId, teacherId, selectedSubjectId, wh);
+                        if (result.placed === result.needed) {
+                            showToast(`${result.placed}コマを時間割に配置しました`, 'success');
+                        } else if (result.placed > 0) {
+                            showToast(`⚠ ${result.needed}コマ中${result.placed}コマのみ配置（空きスロット不足）`, 'warning');
+                        } else {
+                            showToast(`⚠ 空きスロットがないため配置できませんでした（週${result.needed}コマ必要）`, 'error');
+                        }
                     }
                     subjectArea.innerHTML = renderSubjectTags();
                     classArea.innerHTML   = renderClassPanel();
@@ -1299,5 +1312,54 @@ class OverviewRenderer {
 
         overlay.querySelector('#btn-close-asgn-modal').onclick = () => overlay.remove();
         overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    }
+
+    /**
+     * 担当授業をクラス時間割に自動配置する
+     * 完全に空のスロット（他の授業が入っていないスロット）に順番に配置する
+     * @param {string} classId - クラスID
+     * @param {string} teacherId - 教員ID
+     * @param {string} subjectId - 科目ID
+     * @param {number} weeklyHours - 週時間数（配置するコマ数）
+     * @returns {{ placed: number, needed: number }}
+     */
+    _autoPlaceLessons(classId, teacherId, subjectId, weeklyHours) {
+        let placed = 0;
+        outer: for (let day = 0; day < DAYS.length; day++) {
+            for (let period = 0; period < PERIODS; period++) {
+                if (placed >= weeklyHours) break outer;
+                const slots = this.store.getSlot(classId, day, period);
+                if (slots.length === 0) {
+                    this.store.setSlot(classId, day, period, subjectId, [teacherId], null, false);
+                    placed++;
+                }
+            }
+        }
+        return { placed, needed: weeklyHours };
+    }
+
+    /**
+     * 時間割から特定の担当授業エントリを除去する
+     * 他の授業（チームティーチングなど）には影響しない
+     * @param {string} classId - クラスID
+     * @param {string} teacherId - 教員ID
+     * @param {string} subjectId - 科目ID
+     */
+    _removePlacedLessons(classId, teacherId, subjectId) {
+        for (let day = 0; day < DAYS.length; day++) {
+            for (let period = 0; period < PERIODS; period++) {
+                const slots = this.store.getSlot(classId, day, period);
+                const filtered = slots.filter(
+                    s => !(s.subjectId === subjectId && s.teacherIds && s.teacherIds.includes(teacherId))
+                );
+                if (filtered.length !== slots.length) {
+                    if (filtered.length === 0) {
+                        this.store.clearSlot(classId, day, period);
+                    } else {
+                        this.store.setSlotArray(classId, day, period, filtered);
+                    }
+                }
+            }
+        }
     }
 }

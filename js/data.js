@@ -1080,6 +1080,20 @@ class DataStore {
     }
 
     /**
+     * スロットに配列をそのまま書き込む（担当授業の部分削除用）
+     * @param {string} classId - クラスID
+     * @param {number} day - 曜日
+     * @param {number} period - 時限
+     * @param {Array} slotsArray - 書き込むスロット配列
+     */
+    setSlotArray(classId, day, period, slotsArray) {
+        if (!this.timetable[classId]) this.timetable[classId] = {};
+        const key = `${day}-${period}`;
+        this.timetable[classId][key] = slotsArray;
+        this.saveToStorage();
+    }
+
+    /**
      * 連動授業を一括削除
      * @param {string} classId - 基準クラスID
      * @param {number} day - 曜日

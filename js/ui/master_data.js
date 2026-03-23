@@ -66,10 +66,7 @@ class MasterDataManager {
             pane.classList.toggle('hidden', pane.id !== `master-${tabName}`);
         });
 
-        if (tabName === 'assignments') {
-            this.renderAssignmentForm();
-            this.renderAssignmentList();
-        } else if (tabName === 'rooms') {
+        if (tabName === 'rooms') {
             this.renderSpecialClassrooms();
         } else if (tabName === 'subjects') {
             this.renderSubjects();
@@ -107,9 +104,26 @@ class MasterDataManager {
                 }
             }
 
+            // 担当授業サマリーを生成（科目ごとにクラスをまとめる）
+            const teacherAssignments = this.store.assignments.filter(a => a.teacherId === teacher.id);
+            let assignmentSummary = '';
+            if (teacherAssignments.length > 0) {
+                const bySubject = {};
+                teacherAssignments.forEach(a => {
+                    const subName = this.store.getSubject(a.subjectId)?.name || '?';
+                    if (!bySubject[subName]) bySubject[subName] = [];
+                    const cls = CLASSES.find(c => c.id === a.classId);
+                    bySubject[subName].push(cls ? cls.name : a.classId);
+                });
+                const lines = Object.entries(bySubject)
+                    .map(([sub, classes]) => `${escapeHtml(sub)}: ${classes.map(escapeHtml).join(', ')}`)
+                    .join(' | ');
+                assignmentSummary = `<span class="card-assignment-summary">${lines}</span>`;
+            }
+
             return `
-            <div class="card-item teacher-card ${teacher.separator ? 'has-separator' : ''}" 
-                 data-id="${teacher.id}" 
+            <div class="card-item teacher-card ${teacher.separator ? 'has-separator' : ''}"
+                 data-id="${teacher.id}"
                  data-index="${index}"
                  draggable="true"
                  style="${backgroundColor}">
@@ -117,6 +131,7 @@ class MasterDataManager {
                 <div class="card-content" style="display: flex; flex-direction: column; gap: 2px;">
                     <span class="card-name">${escapeHtml(teacher.name)}</span>
                     ${categoryNames ? `<span class="card-category" style="font-size: 0.75em; color: #555;">${escapeHtml(categoryNames)}</span>` : ''}
+                    ${assignmentSummary}
                 </div>
                 <div class="card-actions">
                     <button class="card-separator ${teacher.separator ? 'active' : ''}" data-id="${teacher.id}" title="右側に区切り線">|</button>
@@ -767,7 +782,7 @@ class MasterDataManager {
         const backgroundColor = category?.color || defaultColor;
 
         container.innerHTML = subjects.map(sub => `
-            <div class="card-item subject-card ${sub.isHidden ? 'status-hidden' : ''}" data-id="${sub.id}" 
+            <div class="card-item subject-card ${sub.isHidden ? 'status-hidden' : ''}" data-id="${sub.id}"
                  style="min-width: 270px; padding: 8px 10px; position: relative; display: flex; flex-direction: column; gap: 2px; background-color: ${backgroundColor};">
                 <div class="card-actions" style="position: absolute; top: 4px; right: 4px; display: flex; gap: 3px; flex-shrink: 0;">
                     <button class="card-toggle-hidden" data-id="${sub.id}" title="${sub.isHidden ? 'クラス一覧に表示する' : 'クラス一覧から隠す'}" style="font-size: 1em; padding: 2px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
@@ -779,6 +794,7 @@ class MasterDataManager {
                 <div class="card-content" style="display: flex; flex-direction: column; gap: 2px; padding-right: 80px; overflow: hidden; margin-top: 24px;">
                     <span class="card-name" style="font-size: 1em; font-weight: 500; white-space: nowrap; overflow: visible; text-overflow: clip;">${sub.name}</span>
                     <span class="card-short" style="font-size: 0.6em; color: #555; white-space: nowrap; overflow: visible; text-overflow: clip;">${sub.shortName || ''}</span>
+                    <span style="font-size: 0.7em; color: #444; margin-top: 2px;">${sub.credits || 1}単位</span>
                 </div>
             </div>
         `).join('');
@@ -798,12 +814,7 @@ class MasterDataManager {
             btn.onclick = (e) => {
                 const id = e.target.dataset.id;
                 const sub = this.store.getSubject(id);
-                const name = prompt('科目名を変更', sub.name);
-                if (name) {
-                    const short = prompt('略称を変更', sub.shortName);
-                    this.store.updateSubject(id, name, short || name.slice(0, 4), sub.categoryId, sub.isHidden);
-                    this.renderSubjectList(catId);
-                }
+                if (sub) this._openSubjectEditDialog(sub, catId);
             };
         });
 
@@ -820,14 +831,101 @@ class MasterDataManager {
         const addBtn = document.getElementById('btn-add-subject');
         if (addBtn) {
             addBtn.onclick = () => {
-                const name = prompt('新しい科目名を入力（例：現代文、数学I）');
-                if (name) {
-                    const shortName = name.slice(0, 4);
-                    this.store.addSubject(`s_${Date.now()}`, catId, name, shortName);
-                    this.renderSubjectList(catId);
-                }
+                if (catId) this._openSubjectAddDialog(catId);
             };
         }
+    }
+
+    /** 科目編集ダイアログ */
+    _openSubjectEditDialog(sub, catId) {
+        const existing = document.querySelector('.subject-edit-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay subject-edit-overlay';
+        overlay.innerHTML = `
+            <div class="dialog-content" style="width:340px;">
+                <h3 style="margin-bottom:16px;">科目を編集</h3>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:60px; font-size:0.88em;">科目名</label>
+                        <input id="es-name" type="text" value="${escapeHtml(sub.name)}" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:60px; font-size:0.88em;">略称</label>
+                        <input id="es-short" type="text" value="${escapeHtml(sub.shortName || sub.name)}" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:60px; font-size:0.88em;">単位数</label>
+                        <input id="es-credits" type="number" min="1" max="20" value="${sub.credits || 1}" style="width:60px;">
+                        <span style="font-size:0.85em; color:#666;">単位/週</span>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top:16px;">
+                    <button class="btn btn-secondary" id="es-cancel">キャンセル</button>
+                    <button class="btn btn-primary" id="es-save">保存</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#es-save').onclick = () => {
+            const name   = overlay.querySelector('#es-name').value.trim();
+            const short  = overlay.querySelector('#es-short').value.trim();
+            const credits = parseInt(overlay.querySelector('#es-credits').value) || 1;
+            if (!name) return;
+            this.store.updateSubject(sub.id, { name, shortName: short || name, credits, categoryId: sub.categoryId, isHidden: sub.isHidden });
+            this.renderSubjectList(catId);
+            overlay.remove();
+        };
+        overlay.querySelector('#es-cancel').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    }
+
+    /** 科目追加ダイアログ */
+    _openSubjectAddDialog(catId) {
+        const existing = document.querySelector('.subject-add-overlay');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay subject-add-overlay';
+        overlay.innerHTML = `
+            <div class="dialog-content" style="width:340px;">
+                <h3 style="margin-bottom:16px;">科目を追加</h3>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:60px; font-size:0.88em;">科目名</label>
+                        <input id="as-name" type="text" placeholder="例: 現代文" style="flex:1;" autofocus>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:60px; font-size:0.88em;">略称</label>
+                        <input id="as-short" type="text" placeholder="省略可" style="flex:1;">
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label style="width:60px; font-size:0.88em;">単位数</label>
+                        <input id="as-credits" type="number" min="1" max="20" value="1" style="width:60px;">
+                        <span style="font-size:0.85em; color:#666;">単位/週</span>
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top:16px;">
+                    <button class="btn btn-secondary" id="as-cancel">キャンセル</button>
+                    <button class="btn btn-primary" id="as-save">追加</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#as-save').onclick = () => {
+            const name    = overlay.querySelector('#as-name').value.trim();
+            const short   = overlay.querySelector('#as-short').value.trim();
+            const credits = parseInt(overlay.querySelector('#as-credits').value) || 1;
+            if (!name) return;
+            this.store.addSubject(`s_${Date.now()}`, catId, name, short || name.slice(0, 4), credits);
+            this.renderSubjectList(catId);
+            overlay.remove();
+        };
+        overlay.querySelector('#as-cancel').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     }
 
     // 省略されていた renderElectiveGroups はいったん枠だけ作るか、もし必要なら補完する。

@@ -1820,6 +1820,17 @@ body {
     margin-top: var(--spacing-xs);
 }
 
+.card-assignment-summary {
+    font-size: 0.65em;
+    color: #444;
+    display: block;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+}
+
 /* カードアクションボタン共通 */
 .card-item .card-actions button {
     width: 28px;

@@ -122,7 +122,7 @@ class CSVManager {
     // 教科・科目 CSV
     // ============================================
     exportSubjects() {
-        const rows = [['教科名', '科目名', '略称', '単位数', '学年', 'クラス', '非表示']];
+        const rows = [['教科名', '科目名', '略称', '単位数', '学年', '非表示']];
         this.store.subjects.forEach(s => {
             const category = this.store.getCategory(s.categoryId);
             rows.push([
@@ -131,7 +131,6 @@ class CSVManager {
                 s.shortName || '',
                 s.credits || 1,
                 s.grade || '',
-                s.targetClass || '',
                 s.isHidden ? 'true' : 'false'
             ]);
         });
@@ -155,7 +154,7 @@ class CSVManager {
                 let count = 0;
 
                 // ヘッダー行をスキップ
-                // 形式: 教科名,科目名,略称,単位数,学年,クラス,非表示
+                // 形式: 教科名,科目名,略称,単位数,学年,非表示
                 const firstLine = lines[0].trim();
                 const startIndex = firstLine.startsWith('教科名') ? 1 : 0;
 
@@ -169,8 +168,7 @@ class CSVManager {
                     const shortName     = cols[2]?.trim() || subjectName?.slice(0, 4);
                     const credits       = parseInt(cols[3]?.trim()) || 1;
                     const grade         = cols[4]?.trim() || '';
-                    const targetClass   = cols[5]?.trim() || '';
-                    const isHidden      = cols[6]?.trim().toLowerCase() === 'true';
+                    const isHidden      = cols[5]?.trim().toLowerCase() === 'true';
 
                     if (!categoryName || !subjectName) continue;
 
@@ -187,7 +185,7 @@ class CSVManager {
                         s => s.name === subjectName && s.categoryId === category.id
                     );
                     if (!existing) {
-                        this.store.addSubject(`s_${Date.now()}_${i}`, category.id, subjectName, shortName, credits, grade, targetClass, isHidden);
+                        this.store.addSubject(`s_${Date.now()}_${i}`, category.id, subjectName, shortName, credits, grade, '', isHidden);
                         count++;
                     }
                 }

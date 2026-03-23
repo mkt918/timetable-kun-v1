@@ -125,7 +125,6 @@
                 <div class="master-tabs">
                     <button class="master-tab active" data-tab="teachers">👤 教員</button>
                     <button class="master-tab" data-tab="subjects">📚 教科・科目</button>
-                    <button class="master-tab" data-tab="assignments">📋 担当授業</button>
                     <button class="master-tab" data-tab="rooms">🏫 特別教室</button>
                     <button class="master-tab" data-tab="meetings">📅 会議・業務</button>
                     <button class="master-tab" data-tab="settings">⚙️ 設定</button>
@@ -158,11 +157,11 @@
                     <!-- 会議・業務タブ -->
                     <div id="master-meetings" class="master-pane hidden">
                         <div class="meeting-layout" style="display: flex; gap: 20px;">
-                            <!-- 左側: 会議・業務登録フォーム（スクロール可能） -->
+                            <!-- 左側: 会議・業務登録フォーム -->
                             <div class="meeting-form-panel"
-                                style="flex: 2; max-width: 600px; max-height: 70vh; overflow-y: auto; padding-right: 8px;">
-                                <h4>会議・業務を登録</h4>
-                                <div class="meeting-form" style="display: flex; flex-direction: column; gap: 16px;">
+                                style="flex: 2; max-width: 600px; display: flex; flex-direction: column; padding-right: 8px;">
+                                <h4 style="flex-shrink: 0;">会議・業務を登録</h4>
+                                <div class="meeting-form" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px;">
                                     <div class="form-group">
                                         <label
                                             style="font-size: 1.1em; font-weight: 600; margin-bottom: 8px; display: block;">会議・業務名</label>
@@ -185,7 +184,7 @@
                                                 style="font-size: 0.85em;">☑️ 全選択</button>
                                         </div>
                                         <div class="tag-container" id="meeting-teacher-tags"
-                                            style="max-height: 250px; overflow-y: auto;">
+                                            style="max-height: 200px; overflow-y: auto;">
                                             <!-- 教員タグが動的に生成される -->
                                         </div>
                                     </div>
@@ -196,15 +195,15 @@
                                             <!-- 勤務不可設定と同様のグリッドが動的に生成される -->
                                         </div>
                                     </div>
-
-                                    <div style="display: flex; gap: 8px;">
-                                        <button id="btn-add-meeting" class="btn btn-accent" style="flex: 1;">+
-                                            新規登録</button>
-                                        <button id="btn-update-meeting" class="btn btn-primary"
-                                            style="flex: 1; display: none;">✓ 更新</button>
-                                        <button id="btn-cancel-edit-meeting" class="btn btn-secondary"
-                                            style="display: none;">キャンセル</button>
-                                    </div>
+                                </div>
+                                <!-- 登録ボタンは常に下部に固定表示 -->
+                                <div style="display: flex; gap: 8px; padding-top: 12px; flex-shrink: 0;">
+                                    <button id="btn-add-meeting" class="btn btn-accent" style="flex: 1;">+
+                                        新規登録</button>
+                                    <button id="btn-update-meeting" class="btn btn-primary"
+                                        style="flex: 1; display: none;">✓ 更新</button>
+                                    <button id="btn-cancel-edit-meeting" class="btn btn-secondary"
+                                        style="display: none;">キャンセル</button>
                                 </div>
                             </div>
 
@@ -243,150 +242,6 @@
                                 </div>
                                 <div class="card-grid" id="subject-cards">
                                     <!-- 科目カードが動的に生成される -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- 担当授業タブ -->
-                    <div id="master-assignments" class="master-pane hidden">
-                        <div class="assignment-layout">
-                            <!-- 左側：登録フォーム -->
-                            <div class="assignment-form"
-                                style="max-height: 70vh; overflow-y: auto; padding-right: 8px;">
-                                <div class="assignment-section">
-                                    <h4>1. 教員を教科で絞り込み（複数可）</h4>
-                                    <div class="tag-container" id="assignment-filter-category-tags">
-                                        <!-- 教科フィルタータグが動的に生成される -->
-                                    </div>
-                                </div>
-                                <div class="assignment-section">
-                                    <h4>2. 教員を選択（複数可）</h4>
-                                    <div class="tag-container" id="assignment-teacher-tags">
-                                        <!-- 教員タグが動的に生成される -->
-                                    </div>
-                                </div>
-                                <div class="assignment-section">
-                                    <h4>3. 授業担当教科を選択</h4>
-                                    <div class="tag-container" id="assignment-category-tags">
-                                        <!-- 教科タグが動的に生成される -->
-                                    </div>
-                                </div>
-                                <div class="assignment-section">
-                                    <h4>4. 授業科目を選択</h4>
-                                    <div class="tag-container" id="assignment-subject-tags">
-                                        <!-- 科目タグが動的に生成される -->
-                                    </div>
-                                </div>
-                                <div class="assignment-section">
-                                    <h4>5. クラスを選択（複数可）</h4>
-                                    <div class="tag-container" id="assignment-class-tags" style="flex-wrap: wrap;">
-                                        <!-- クラスタグが動的に生成される -->
-                                    </div>
-                                </div>
-                                <div class="assignment-section">
-                                    <h4>6. 週時間数</h4>
-                                    <div class="hours-control"
-                                        style="transform: scale(1.3); transform-origin: left center; margin: 10px 0;">
-                                        <button class="hours-btn" id="btn-hours-dec"
-                                            style="font-size: 1.5em;">−</button>
-                                        <div class="hours-blocks" id="hours-blocks">
-                                            <!-- 時間数ブロックが動的に生成される -->
-                                        </div>
-                                        <button class="hours-btn" id="btn-hours-inc"
-                                            style="font-size: 1.5em;">+</button>
-                                        <span class="hours-label" id="hours-label"
-                                            style="font-size: 1.2em; font-weight: bold;">0/35</span>
-                                    </div>
-                                </div>
-                                <div class="assignment-actions">
-                                    <button id="btn-add-assignment" class="btn btn-primary">担当授業を追加</button>
-                                </div>
-                            </div>
-                            <!-- 右側：登録済みリスト -->
-                            <div class="assignment-list-section">
-                                <div class="assignment-list-header" style="flex-direction: column; gap: 12px;">
-                                    <h4 style="margin: 0;">登録済み担当授業</h4>
-                                    <!-- フィルターグループ -->
-                                    <div class="assignment-filters"
-                                        style="display: flex; flex-direction: column; gap: 16px; padding: 12px; background: var(--color-bg-secondary); border-radius: 8px;">
-
-                                        <!-- グループ1: 教員で絞り込み -->
-                                        <div class="filter-group"
-                                            style="display: flex; flex-direction: column; gap: 8px;">
-                                            <label
-                                                style="font-weight: 600; font-size: 0.9em; color: var(--color-text-primary);">📋
-                                                教員で絞り込み</label>
-                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                                <select id="assignment-filter-teacher-category"
-                                                    class="assignment-filter" style="min-width: 120px;"
-                                                    onchange="ui.masterData.handleTeacherCategoryFilter()">
-                                                    <option value="">すべての教科</option>
-                                                    <!-- 教科オプションが動的に生成される -->
-                                                </select>
-                                                <select id="assignment-filter-teacher" class="assignment-filter"
-                                                    style="min-width: 140px;"
-                                                    onchange="ui.masterData.renderAssignmentList()">
-                                                    <option value="">すべての教員</option>
-                                                    <!-- 教員オプションが動的に生成される -->
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <!-- グループ2: 科目で絞り込み -->
-                                        <div class="filter-group"
-                                            style="display: flex; flex-direction: column; gap: 8px;">
-                                            <label
-                                                style="font-weight: 600; font-size: 0.9em; color: var(--color-text-primary);">📚
-                                                科目で絞り込み</label>
-                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                                <select id="assignment-filter-category-select" class="assignment-filter"
-                                                    style="min-width: 120px;"
-                                                    onchange="ui.masterData.handleSubjectCategoryFilter()">
-                                                    <option value="">すべての教科</option>
-                                                    <!-- 教科オプションが動的に生成される -->
-                                                </select>
-                                                <select id="assignment-filter-subject-select" class="assignment-filter"
-                                                    style="min-width: 140px;"
-                                                    onchange="ui.masterData.renderAssignmentList()">
-                                                    <option value="">すべての科目</option>
-                                                    <!-- 科目オプションが動的に生成される -->
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <!-- グループ3: クラスで絞り込み -->
-                                        <div class="filter-group"
-                                            style="display: flex; flex-direction: column; gap: 8px;">
-                                            <label
-                                                style="font-weight: 600; font-size: 0.9em; color: var(--color-text-primary);">🏫
-                                                クラスで絞り込み</label>
-                                            <select id="assignment-filter-class-select" class="assignment-filter"
-                                                style="min-width: 140px;"
-                                                onchange="ui.masterData.renderAssignmentList()">
-                                                <option value="">すべてのクラス</option>
-                                                <!-- クラスオプションが動的に生成される -->
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <!-- 一括操作ボタン -->
-                                    <div class="assignment-batch-controls" style="display: flex; gap: 8px;">
-                                        <button id="btn-select-all" class="btn btn-secondary btn-sm"
-                                            onclick="ui.masterData.handleSelectAllAssignments()">
-                                            ☑️ 全選択
-                                        </button>
-                                        <button id="btn-batch-edit" class="btn btn-secondary btn-sm"
-                                            onclick="ui.masterData.handleBatchEdit()">
-                                            ✏️ まとめて時間数を編集
-                                        </button>
-                                        <button id="btn-delete-selected" class="btn btn-danger btn-sm"
-                                            onclick="ui.masterData.handleBatchDelete()">
-                                            🗑️ まとめて削除
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="assignment-list" id="assignment-list"
-                                    style="max-height: 50vh; overflow-y: auto;">
-                                    <!-- 担当授業リストが動的に生成される -->
                                 </div>
                             </div>
                         </div>
