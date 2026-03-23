@@ -81,8 +81,9 @@ class TeacherTableRenderer {
                 lessonDisplay = `${lessonData.current}コマ`;
             }
 
-            html += `<th class="${separatorClass}" style="cursor: pointer;" onclick="ui.openUnavailableSettingsModal('${teacher.id}')" title="クリックして勤務不可時間を設定">
-                ${teacher.name} <span style="font-size:0.8em">⚙️</span>
+            html += `<th class="${separatorClass}" style="cursor: default;">
+                <span style="cursor: pointer; text-decoration: underline dotted;" onclick="ui.openTeacherAssignmentModal('${teacher.id}')" title="クリックして担当授業を設定">${teacher.name}</span>
+                <span style="cursor: pointer; font-size:0.8em; margin-left:4px;" onclick="ui.openUnavailableSettingsModal('${teacher.id}')" title="勤務不可設定">⚙️</span>
                 <div style="font-size: 0.8em; font-weight: normal; color: #666;">${lessonDisplay}</div>
             </th>`;
         });

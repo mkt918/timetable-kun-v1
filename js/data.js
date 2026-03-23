@@ -571,26 +571,53 @@ class DataStore {
     // 科目管理（現代文、古典など）
     // ==========================================
 
-    addSubject(id, categoryId, name, shortName, isHidden = false) {
+    addSubject(id, categoryId, name, shortName, credits = 1, isHidden = false) {
         if (this.subjects.find(s => s.id === id)) {
             return { success: false, message: '同じIDの科目が存在します' };
         }
-        this.subjects.push({ id, categoryId, name, shortName: shortName || name, isHidden });
+        this.subjects.push({ id, categoryId, name, shortName: shortName || name, credits: parseInt(credits) || 1, isHidden });
         this.saveToStorage();
         return { success: true };
     }
 
-    updateSubject(id, name, shortName, categoryId, isHidden = false) {
+    /**
+     * 科目を更新する。
+     * オブジェクト形式: updateSubject(id, { name, shortName, categoryId, isHidden, credits })
+     * 個別引数形式（後方互換）: updateSubject(id, name, shortName, categoryId, isHidden)
+     * creditsが変更された場合、関連する担当授業のweeklyHoursも自動更新（完全連動）
+     */
+    updateSubject(id, nameOrData, shortName, categoryId, isHidden = false) {
         const subject = this.subjects.find(s => s.id === id);
-        if (subject) {
-            subject.name = name;
-            subject.shortName = shortName || name;
-            if (categoryId) subject.categoryId = categoryId; // categoryId更新対応
+        if (!subject) return { success: false, message: '科目が見つかりません' };
+
+        if (typeof nameOrData === 'object' && nameOrData !== null) {
+            // オブジェクト形式: { name, shortName, categoryId, isHidden, credits }
+            const data = nameOrData;
+            const oldCredits = subject.credits || 1;
+            if (data.name !== undefined) subject.name = data.name;
+            if (data.shortName !== undefined) subject.shortName = data.shortName || subject.name;
+            if (data.categoryId !== undefined) subject.categoryId = data.categoryId;
+            if (data.isHidden !== undefined) subject.isHidden = data.isHidden;
+            if (data.credits !== undefined) {
+                const newCredits = parseInt(data.credits) || 1;
+                subject.credits = newCredits;
+                // 単位数変更時は関連担当授業の週時間数も自動更新（完全連動）
+                if (newCredits !== oldCredits) {
+                    this.assignments
+                        .filter(a => a.subjectId === id)
+                        .forEach(a => { a.weeklyHours = newCredits; });
+                }
+            }
+        } else {
+            // 個別引数形式（後方互換性維持）
+            subject.name = nameOrData;
+            subject.shortName = shortName || nameOrData;
+            if (categoryId) subject.categoryId = categoryId;
             subject.isHidden = isHidden;
-            this.saveToStorage();
-            return { success: true };
         }
-        return { success: false, message: '科目が見つかりません' };
+
+        this.saveToStorage();
+        return { success: true };
     }
 
     deleteSubject(id) {
@@ -1839,7 +1866,7 @@ class DataStore {
 
     /**
      * 統合CSVを読み込み（マスターデータ一括）
-     * 形式: type,id,name,shortName,categoryId,teacherId,subjectId,classId,weeklyHours
+     * 形式: type,id,name,shortName,categoryId,credits,teacherId,subjectId,classId,weeklyHours
      */
     importUnifiedCSV(csvText) {
         const data = this.parseCSV(csvText);
@@ -1870,7 +1897,8 @@ class DataStore {
                     break;
                 case 'subject':
                     if (row.id && row.categoryId && row.name) {
-                        const result = this.addSubject(row.id, row.categoryId, row.name, row.shortName);
+                        const credits = parseInt(row.credits) || 1;
+                        const result = this.addSubject(row.id, row.categoryId, row.name, row.shortName, credits);
                         if (result.success) subjectCount++;
                     }
                     break;
@@ -1903,8 +1931,8 @@ class DataStore {
     exportUnifiedCSV() {
         const lines = [];
 
-        // ヘッダー
-        lines.push('type,id,name,shortName,categoryId,teacherId,subjectId,classId,weeklyHours');
+        // ヘッダー（creditsカラムを含む10列）
+        lines.push('type,id,name,shortName,categoryId,credits,teacherId,subjectId,classId,weeklyHours');
 
         // 教員データ
         this.teachers.forEach(t => {
@@ -1916,9 +1944,9 @@ class DataStore {
             lines.push(`category,${c.id},${c.name},,,,,,,`);
         });
 
-        // 科目データ
+        // 科目データ（creditsを含む）
         this.subjects.forEach(s => {
-            lines.push(`subject,${s.id},${s.name},${s.shortName},${s.categoryId},,,,`);
+            lines.push(`subject,${s.id},${s.name},${s.shortName},${s.categoryId},${s.credits || 1},,,`);
         });
 
         // 担当授業データ

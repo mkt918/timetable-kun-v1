@@ -162,6 +162,11 @@ class TimetableUI {
     openUnavailableSettingsModal(teacherId) {
         this.unavailableSettings.open(teacherId);
     }
+
+    // 担当授業管理モーダル Facade
+    openTeacherAssignmentModal(teacherId) {
+        this.overview.openTeacherAssignmentModal(teacherId);
+    }
     toggleUnavailableBulk(type, index) {
         this.unavailableSettings.toggleBulk(type, index);
     }

@@ -169,8 +169,9 @@ class OverviewRenderer {
                 lessonDisplay = `${lessonCount}コマ`;
             }
 
-            html += `<th class="${separatorClass}" style="cursor: pointer;" onclick="ui.openUnavailableSettingsModal('${escapeHtml(teacher.id)}')" title="クリックして勤務不可時間を設定">
-                ${escapeHtml(teacher.name)} <span style="font-size:0.8em">⚙️</span>
+            html += `<th class="${separatorClass}" style="cursor: default;">
+                <span style="cursor: pointer; text-decoration: underline dotted;" onclick="ui.openTeacherAssignmentModal('${escapeHtml(teacher.id)}')" title="クリックして担当授業を設定">${escapeHtml(teacher.name)}</span>
+                <span style="cursor: pointer; font-size:0.8em; margin-left:4px;" onclick="ui.openUnavailableSettingsModal('${escapeHtml(teacher.id)}')" title="勤務不可設定">⚙️</span>
                 <div style="font-size: 0.8em; font-weight: normal; color: #666;">${lessonDisplay}</div>
             </th>`;
         });
@@ -1101,5 +1102,135 @@ class OverviewRenderer {
                 warningBadge.classList.add('hidden');
             }
         }
+    }
+
+    /**
+     * 教員の担当授業管理モーダルを開く
+     * 科目を選択すると週時間数に科目の単位数が自動設定される（完全連動）
+     */
+    openTeacherAssignmentModal(teacherId) {
+        const teacher = this.store.getTeacher(teacherId);
+        if (!teacher) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay';
+
+        const renderList = () => {
+            const assignments = this.store.assignments.filter(a => a.teacherId === teacherId);
+            if (assignments.length === 0) {
+                return '<p style="color:#888; text-align:center;">担当授業がありません</p>';
+            }
+            return assignments.map(a => {
+                const sub = this.store.getSubject(a.subjectId);
+                const cls = CLASSES.find(c => c.id === a.classId);
+                return `
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #eee;">
+                        <span style="flex:1;">${escapeHtml(sub ? sub.name : '不明')}</span>
+                        <span style="color:#666;">${escapeHtml(cls ? cls.name : a.classId)}</span>
+                        <span style="color:#666; width:60px; text-align:right;">${a.weeklyHours}時間/週</span>
+                        <button class="btn-delete-assignment" data-subject-id="${escapeHtml(a.subjectId)}" data-class-id="${escapeHtml(a.classId)}"
+                                style="background:none; border:1px solid #ccc; border-radius:4px; cursor:pointer; padding:2px 8px; color:#e53e3e;">×</button>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        // 科目セレクトのoptions生成（教科ごとにグループ化）
+        const subjectOptions = this.store.categories.map(cat => {
+            const subs = this.store.subjects.filter(s => s.categoryId === cat.id && !s.isHidden);
+            if (subs.length === 0) return '';
+            return `<optgroup label="${escapeHtml(cat.name)}">
+                ${subs.map(s => `<option value="${escapeHtml(s.id)}" data-credits="${s.credits || 1}">${escapeHtml(s.name)}（${s.credits || 1}単位）</option>`).join('')}
+            </optgroup>`;
+        }).join('');
+
+        const classOptions = CLASSES.map(c =>
+            `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`
+        ).join('');
+
+        overlay.innerHTML = `
+            <div class="dialog-content" style="width:520px; max-width:90vw; max-height:80vh; overflow-y:auto;">
+                <h3 style="margin-bottom:16px;">${escapeHtml(teacher.name)} の担当授業</h3>
+                <div id="teacher-assignment-list" style="margin-bottom:16px;">
+                    ${renderList()}
+                </div>
+                <h4 style="margin-bottom:8px; font-size:0.95em; color:#555;">新規追加</h4>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <select id="new-asgn-subject" style="flex:2; min-width:120px;">
+                        <option value="">科目を選択</option>
+                        ${subjectOptions}
+                    </select>
+                    <select id="new-asgn-class" style="flex:1; min-width:80px;">
+                        <option value="">クラス</option>
+                        ${classOptions}
+                    </select>
+                    <input type="number" id="new-asgn-hours" min="1" max="20" value="1" style="width:55px;" title="週時間数">
+                    <span style="font-size:0.85em; color:#666;">時間/週</span>
+                    <button id="btn-add-asgn" class="btn btn-primary" style="white-space:nowrap;">追加</button>
+                </div>
+                <div class="form-actions" style="margin-top:16px;">
+                    <button class="btn btn-secondary" id="btn-close-asgn-modal">閉じる</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const listEl = overlay.querySelector('#teacher-assignment-list');
+
+        // リスト再描画ヘルパー
+        const refreshList = () => {
+            listEl.innerHTML = renderList();
+            attachDeleteEvents();
+            this.render();
+        };
+
+        // 削除ボタンのイベント設定
+        const attachDeleteEvents = () => {
+            listEl.querySelectorAll('.btn-delete-assignment').forEach(btn => {
+                btn.onclick = () => {
+                    const subjectId = btn.dataset.subjectId;
+                    const classId = btn.dataset.classId;
+                    const sub = this.store.getSubject(subjectId);
+                    const cls = CLASSES.find(c => c.id === classId);
+                    if (confirm(`「${sub ? sub.name : '不明'}（${cls ? cls.name : classId}）」を削除しますか？`)) {
+                        this.store.deleteAssignment(teacherId, subjectId, classId);
+                        refreshList();
+                    }
+                };
+            });
+        };
+        attachDeleteEvents();
+
+        // 科目選択で単位数を自動セット（完全連動）
+        overlay.querySelector('#new-asgn-subject').onchange = (e) => {
+            const opt = e.target.selectedOptions[0];
+            if (opt && opt.dataset.credits) {
+                overlay.querySelector('#new-asgn-hours').value = opt.dataset.credits;
+            }
+        };
+
+        // 追加ボタン
+        overlay.querySelector('#btn-add-asgn').onclick = () => {
+            const subjectId = overlay.querySelector('#new-asgn-subject').value;
+            const classId = overlay.querySelector('#new-asgn-class').value;
+            const hours = parseInt(overlay.querySelector('#new-asgn-hours').value);
+            if (!subjectId || !classId || !hours) {
+                showToast('科目・クラス・週時間数を入力してください', 'error');
+                return;
+            }
+            const result = this.store.addAssignment(teacherId, subjectId, classId, hours);
+            if (result.success) {
+                refreshList();
+                overlay.querySelector('#new-asgn-subject').value = '';
+                overlay.querySelector('#new-asgn-class').value = '';
+                overlay.querySelector('#new-asgn-hours').value = '1';
+                showToast('追加しました', 'success');
+            } else {
+                showToast(result.message || '追加に失敗しました', 'error');
+            }
+        };
+
+        overlay.querySelector('#btn-close-asgn-modal').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     }
 }

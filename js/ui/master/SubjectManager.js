@@ -181,8 +181,10 @@ class SubjectManager {
         if (subjects.length === 0) {
             container.innerHTML = `
                 <p class="placeholder-text">この教科に科目がありません</p>
-                <div style="margin-top: 16px;">
-                    <input type="text" id="new-subject-name" placeholder="新しい科目名">
+                <div style="margin-top: 16px; display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="new-subject-name" placeholder="新しい科目名" style="flex:1;">
+                    <input type="number" id="new-subject-credits" min="1" max="20" value="1" style="width:60px;" title="単位数">
+                    <span style="font-size:0.85em; color:#666;">単位</span>
                     <button id="btn-add-subject" class="btn btn-primary">追加</button>
                 </div>
             `;
@@ -193,6 +195,7 @@ class SubjectManager {
                     <div class="subject-item" data-id="${sub.id}">
                         <span class="subject-name">${escapeHtml(sub.name)}</span>
                         <span class="subject-short">(${escapeHtml(sub.shortName || sub.name)})</span>
+                        <span class="subject-credits" style="font-size:0.85em; color:#666; margin-left:6px;">${sub.credits || 1}単位</span>
                         <div class="subject-actions">
                             <button class="btn-edit" data-id="${sub.id}">✏️</button>
                             <button class="btn-delete" data-id="${sub.id}">×</button>
@@ -202,8 +205,10 @@ class SubjectManager {
             });
             html += '</div>';
             html += `
-                <div style="margin-top: 16px;">
-                    <input type="text" id="new-subject-name" placeholder="新しい科目名">
+                <div style="margin-top: 16px; display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="new-subject-name" placeholder="新しい科目名" style="flex:1;">
+                    <input type="number" id="new-subject-credits" min="1" max="20" value="1" style="width:60px;" title="単位数">
+                    <span style="font-size:0.85em; color:#666;">単位</span>
                     <button id="btn-add-subject" class="btn btn-primary">追加</button>
                 </div>
             `;
@@ -222,9 +227,12 @@ class SubjectManager {
                     const newName = prompt('科目名を編集', sub.name);
                     if (newName && newName.trim()) {
                         const shortName = prompt('短縮名を編集', sub.shortName || newName.trim());
+                        const creditsInput = prompt('単位数を編集', sub.credits || 1);
+                        const credits = parseInt(creditsInput) || (sub.credits || 1);
                         this.store.updateSubject(btn.dataset.id, {
                             name: newName.trim(),
-                            shortName: shortName?.trim() || newName.trim()
+                            shortName: shortName?.trim() || newName.trim(),
+                            credits
                         });
                         this.render(catId);
                     }
@@ -249,11 +257,14 @@ class SubjectManager {
         if (addBtn) {
             addBtn.onclick = () => {
                 const input = document.getElementById('new-subject-name');
+                const creditsInput = document.getElementById('new-subject-credits');
                 const name = input.value.trim();
+                const credits = parseInt(creditsInput?.value) || 1;
                 if (name && catId) {
-                    this.store.addSubject(`sub_${Date.now()}`, name, name, catId);
+                    this.store.addSubject(`sub_${Date.now()}`, catId, name, name, credits);
                     this.render(catId);
                     input.value = '';
+                    if (creditsInput) creditsInput.value = '1';
                     showToast('追加しました', 'success');
                 }
             };
