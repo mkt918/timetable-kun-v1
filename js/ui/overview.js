@@ -1105,50 +1105,65 @@ class OverviewRenderer {
     }
 
     /**
-     * 教員の担当授業管理モーダル（タグ選択UI）
-     * 科目タグ → クラスタグの2段階でクリックして担当をON/OFF
-     * 単位数はcreditsと完全連動
+     * 教員の担当授業管理モーダル（教科→科目→クラスの3段階タグUI）
+     * 教科タグで絞り込み → 科目タグ選択 → クラスタグでON/OFF
+     * 教員の担当教科（categoryIds）を初期選択
      */
     openTeacherAssignmentModal(teacherId) {
         const teacher = this.store.getTeacher(teacherId);
         if (!teacher) return;
 
-        // 既存モーダルがあれば閉じる
         document.querySelectorAll('.asgn-modal-overlay').forEach(el => el.remove());
 
         const overlay = document.createElement('div');
         overlay.className = 'dialog-overlay asgn-modal-overlay';
 
-        // 教科ごとのカテゴリ色（インデックスベース）
+        // 教科ごとの色
         const catColorMap = {};
         this.store.categories.forEach((cat, i) => {
             catColorMap[cat.id] = cat.color || `hsl(${(i * 47) % 360}, 60%, 88%)`;
         });
 
+        // 教員の担当教科の最初のIDを初期選択
+        const teacherCatIds = teacher.categoryIds || [];
+        let selectedCategoryId = teacherCatIds.length > 0 ? teacherCatIds[0] : (this.store.categories[0]?.id || null);
         let selectedSubjectId = null;
 
-        // 科目タグHTMLを生成
+        // ── 教科タグ ──
+        const renderCategoryTags = () => {
+            return this.store.categories.map(cat => {
+                const isSelected = cat.id === selectedCategoryId;
+                const isTeacherCat = teacherCatIds.includes(cat.id);
+                const bg = isSelected ? (catColorMap[cat.id] || '#e0e7ff') : '#f5f5f5';
+                const border = isSelected ? '2px solid #4a6fa5' : (isTeacherCat ? `2px solid ${catColorMap[cat.id] || '#ccc'}` : '2px solid #ddd');
+                const fw = isTeacherCat ? 'bold' : 'normal';
+                return `
+                    <span class="asgn-cat-tag" data-cat-id="${escapeHtml(cat.id)}"
+                          style="padding:4px 12px; border-radius:20px; cursor:pointer; font-size:0.88em;
+                                 user-select:none; font-weight:${fw};
+                                 background:${bg}; border:${border};">
+                        ${escapeHtml(cat.name)}
+                    </span>
+                `;
+            }).join('');
+        };
+
+        // ── 科目タグ（選択教科でフィルタ） ──
         const renderSubjectTags = () => {
-            const allSubjects = this.store.subjects.filter(s => !s.isHidden);
-            if (allSubjects.length === 0) {
-                return '<p style="color:#888;">科目が登録されていません</p>';
-            }
-            return allSubjects.map(s => {
-                const myAssignments = this.store.assignments.filter(
-                    a => a.teacherId === teacherId && a.subjectId === s.id
-                );
-                const count = myAssignments.length;
+            if (!selectedCategoryId) return '<p style="color:#aaa; font-size:0.9em;">教科を選択してください</p>';
+            const subjects = this.store.subjects.filter(s => s.categoryId === selectedCategoryId && !s.isHidden);
+            if (subjects.length === 0) return '<p style="color:#aaa; font-size:0.9em;">この教科に科目がありません</p>';
+            return subjects.map(s => {
+                const count = this.store.assignments.filter(a => a.teacherId === teacherId && a.subjectId === s.id).length;
                 const isSelected = s.id === selectedSubjectId;
-                const bgColor = isSelected
-                    ? (catColorMap[s.categoryId] || '#e0e7ff')
-                    : (count > 0 ? (catColorMap[s.categoryId] || '#f0f0f0') : '#f5f5f5');
+                const bg = isSelected ? (catColorMap[s.categoryId] || '#e0e7ff') : (count > 0 ? (catColorMap[s.categoryId] || '#f0f0f0') : '#f5f5f5');
                 const border = isSelected ? '2px solid #4a6fa5' : (count > 0 ? '2px solid transparent' : '2px solid #ddd');
-                const opacity = count === 0 && !isSelected ? '0.65' : '1';
+                const opacity = count === 0 && !isSelected ? '0.6' : '1';
                 return `
                     <span class="asgn-subject-tag" data-subject-id="${escapeHtml(s.id)}"
                           style="display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:20px;
-                                 cursor:pointer; font-size:0.88em; user-select:none; transition:all 0.15s;
-                                 background:${bgColor}; border:${border}; opacity:${opacity};">
+                                 cursor:pointer; font-size:0.88em; user-select:none;
+                                 background:${bg}; border:${border}; opacity:${opacity};">
                         ${escapeHtml(s.name)}
                         ${count > 0 ? `<span style="background:#4a6fa5; color:#fff; border-radius:50%; width:18px; height:18px; font-size:0.75em; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">${count}</span>` : ''}
                     </span>
@@ -1156,24 +1171,19 @@ class OverviewRenderer {
             }).join('');
         };
 
-        // クラスタグパネルHTMLを生成
+        // ── クラスタグ ──
         const renderClassPanel = () => {
-            if (!selectedSubjectId) {
-                return '<p style="color:#aaa; font-size:0.9em;">← 科目を選択してください</p>';
-            }
+            if (!selectedSubjectId) return '<p style="color:#aaa; font-size:0.9em;">← 科目を選択してください</p>';
             const sub = this.store.getSubject(selectedSubjectId);
             if (!sub) return '';
             const assignedClassIds = new Set(
-                this.store.assignments
-                    .filter(a => a.teacherId === teacherId && a.subjectId === selectedSubjectId)
-                    .map(a => a.classId)
+                this.store.assignments.filter(a => a.teacherId === teacherId && a.subjectId === selectedSubjectId).map(a => a.classId)
             );
             const tags = CLASSES.map(c => {
                 const isActive = assignedClassIds.has(c.id);
                 return `
                     <span class="asgn-class-tag" data-class-id="${escapeHtml(c.id)}"
-                          style="display:inline-block; padding:5px 12px; border-radius:16px; cursor:pointer;
-                                 font-size:0.88em; user-select:none; transition:all 0.15s;
+                          style="padding:5px 12px; border-radius:16px; cursor:pointer; font-size:0.88em; user-select:none;
                                  background:${isActive ? '#4a6fa5' : '#f0f0f0'};
                                  color:${isActive ? '#fff' : '#333'};
                                  border:2px solid ${isActive ? '#3a5f95' : '#ddd'};">
@@ -1190,44 +1200,66 @@ class OverviewRenderer {
         };
 
         overlay.innerHTML = `
-            <div class="dialog-content" style="width:620px; max-width:92vw; max-height:85vh; display:flex; flex-direction:column; gap:0; padding:24px;">
-                <h3 style="margin:0 0 16px;">${escapeHtml(teacher.name)} の担当授業</h3>
+            <div class="dialog-content" style="width:640px; max-width:92vw; max-height:85vh; display:flex; flex-direction:column; gap:0; padding:24px;">
+                <h3 style="margin:0 0 14px;">${escapeHtml(teacher.name)} の担当授業</h3>
 
-                <div style="font-size:0.8em; color:#888; margin-bottom:6px;">科目を選択 →</div>
-                <div id="asgn-subject-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:16px; border-bottom:1px solid #e5e7eb; max-height:200px; overflow-y:auto;">
+                <div style="font-size:0.78em; color:#888; margin-bottom:4px;">① 教科</div>
+                <div id="asgn-cat-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:12px; border-bottom:1px solid #e5e7eb;">
+                    ${renderCategoryTags()}
+                </div>
+
+                <div style="font-size:0.78em; color:#888; margin:10px 0 4px;">② 科目</div>
+                <div id="asgn-subject-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:12px; border-bottom:1px solid #e5e7eb; min-height:36px;">
                     ${renderSubjectTags()}
                 </div>
 
-                <div id="asgn-class-area" style="padding:16px 0; min-height:80px; border-bottom:1px solid #e5e7eb;">
+                <div style="font-size:0.78em; color:#888; margin:10px 0 4px;">③ クラス（クリックで担当ON/OFF）</div>
+                <div id="asgn-class-area" style="min-height:60px; padding-bottom:12px; border-bottom:1px solid #e5e7eb;">
                     ${renderClassPanel()}
                 </div>
 
-                <div style="padding-top:16px; text-align:right;">
+                <div style="padding-top:14px; text-align:right;">
                     <button class="btn btn-secondary" id="btn-close-asgn-modal">閉じる</button>
                 </div>
             </div>
         `;
         document.body.appendChild(overlay);
 
+        const catArea     = overlay.querySelector('#asgn-cat-area');
         const subjectArea = overlay.querySelector('#asgn-subject-area');
-        const classArea = overlay.querySelector('#asgn-class-area');
+        const classArea   = overlay.querySelector('#asgn-class-area');
 
-        // 科目タグのイベント設定
+        const redrawAll = () => {
+            catArea.innerHTML     = renderCategoryTags();
+            subjectArea.innerHTML = renderSubjectTags();
+            classArea.innerHTML   = renderClassPanel();
+            attachCatEvents();
+            attachSubjectEvents();
+            attachClassEvents();
+        };
+
+        const attachCatEvents = () => {
+            catArea.querySelectorAll('.asgn-cat-tag').forEach(tag => {
+                tag.onclick = () => {
+                    selectedCategoryId = tag.dataset.catId;
+                    selectedSubjectId = null;  // 教科変更で科目選択リセット
+                    redrawAll();
+                };
+            });
+        };
+
         const attachSubjectEvents = () => {
             subjectArea.querySelectorAll('.asgn-subject-tag').forEach(tag => {
                 tag.onclick = () => {
-                    selectedSubjectId = tag.dataset.subjectId === selectedSubjectId
-                        ? null  // 同じ科目をクリックで解除
-                        : tag.dataset.subjectId;
+                    selectedSubjectId = tag.dataset.subjectId === selectedSubjectId ? null : tag.dataset.subjectId;
                     subjectArea.innerHTML = renderSubjectTags();
+                    classArea.innerHTML   = renderClassPanel();
                     attachSubjectEvents();
-                    classArea.innerHTML = renderClassPanel();
                     attachClassEvents();
                 };
             });
         };
 
-        // クラスタグのイベント設定
         const attachClassEvents = () => {
             classArea.querySelectorAll('.asgn-class-tag').forEach(tag => {
                 tag.onclick = () => {
@@ -1238,22 +1270,20 @@ class OverviewRenderer {
                         a => a.teacherId === teacherId && a.subjectId === selectedSubjectId && a.classId === classId
                     );
                     if (existing) {
-                        // 担当解除
                         this.store.deleteAssignment(teacherId, selectedSubjectId, classId);
                     } else {
-                        // 担当追加（単位数をweeklyHoursとして使用）
                         this.store.addAssignment(teacherId, selectedSubjectId, classId, sub ? (sub.credits || 1) : 1);
                     }
-                    // 両エリアを再描画
                     subjectArea.innerHTML = renderSubjectTags();
+                    classArea.innerHTML   = renderClassPanel();
                     attachSubjectEvents();
-                    classArea.innerHTML = renderClassPanel();
                     attachClassEvents();
                     this.render();
                 };
             });
         };
 
+        attachCatEvents();
         attachSubjectEvents();
         attachClassEvents();
 
