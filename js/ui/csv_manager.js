@@ -122,13 +122,14 @@ class CSVManager {
     // 教科・科目 CSV
     // ============================================
     exportSubjects() {
-        const rows = [['教科名', '科目名', '略称', '非表示']];
+        const rows = [['教科名', '科目名', '略称', '単位数', '非表示']];
         this.store.subjects.forEach(s => {
             const category = this.store.getCategory(s.categoryId);
             rows.push([
                 category?.name || '',
                 s.name,
                 s.shortName || '',
+                s.credits || 1,
                 s.isHidden ? 'true' : 'false'
             ]);
         });
@@ -151,8 +152,9 @@ class CSVManager {
                 const lines = text.split(/\r\n|\n/);
                 let count = 0;
 
-                // ヘッダースキップ判定
+                // ヘッダースキップ判定 + 新旧フォーマット判別
                 const firstLine = lines[0].trim();
+                const hasCreditsColumn = firstLine.includes('単位数');
                 const startIndex = firstLine.startsWith('教科名') ? 1 : 0;
 
                 for (let i = startIndex; i < lines.length; i++) {
@@ -163,7 +165,12 @@ class CSVManager {
                     const categoryName = cols[0]?.trim();
                     const subjectName = cols[1]?.trim();
                     const shortName = cols[2]?.trim() || subjectName?.slice(0, 4);
-                    const isHidden = cols[3]?.trim().toLowerCase() === 'true';
+                    // 新形式: [教科名, 科目名, 略称, 単位数, 非表示]
+                    // 旧形式: [教科名, 科目名, 略称, 非表示]
+                    const credits = hasCreditsColumn ? (parseInt(cols[3]?.trim()) || 1) : 1;
+                    const isHidden = hasCreditsColumn
+                        ? cols[4]?.trim().toLowerCase() === 'true'
+                        : cols[3]?.trim().toLowerCase() === 'true';
 
                     if (!categoryName || !subjectName) continue;
 
@@ -180,11 +187,11 @@ class CSVManager {
                         s => s.name === subjectName && s.categoryId === category.id
                     );
                     if (!existing) {
-                        this.store.addSubject(`s_${Date.now()}_${i}`, category.id, subjectName, shortName);
+                        this.store.addSubject(`s_${Date.now()}_${i}`, category.id, subjectName, shortName, credits);
                         // isHidden設定
                         if (isHidden) {
                             const newSubject = this.store.subjects[this.store.subjects.length - 1];
-                            this.store.updateSubject(newSubject.id, subjectName, shortName, category.id, true);
+                            this.store.updateSubject(newSubject.id, { isHidden: true });
                         }
                         count++;
                     }

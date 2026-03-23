@@ -1834,7 +1834,8 @@ class DataStore {
 
         data.forEach(row => {
             if (row.id && row.name) {
-                const result = this.addSubject(row.id, row.name, row.shortName);
+                const credits = parseInt(row.credits) || 1;
+                const result = this.addSubject(row.id, row.categoryId || '', row.name, row.shortName, credits);
                 if (result.success) count++;
             }
         });
