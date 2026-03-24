@@ -449,6 +449,16 @@ class LessonManager {
             subjectId: cb.dataset.subjectId
         }));
 
+        // ★ 削除前のスロット状態をスナップショット（競合チェックに使用）
+        const preDeleteSnapshot = {};
+        const affectedClassIds = new Set([
+            ...currentSlots.map(s => s.classId),
+            ...selectedLessons.map(l => l.classId)
+        ]);
+        affectedClassIds.forEach(cid => {
+            preDeleteSnapshot[cid] = [...this.store.getSlot(cid, day, period)];
+        });
+
         // 学年違い合同授業の警告チェック
         if (selectedLessons.length > 1) {
             const grades = new Set();
@@ -537,14 +547,30 @@ class LessonManager {
             const classId = checkbox.dataset.classId;
             const subjectId = checkbox.dataset.subjectId;
 
-            // 既存の授業を取得
-            const existingSlots = this.store.getSlot(classId, day, period);
+            const cls = CLASSES.find(c => c.id === classId);
+            const className = cls ? cls.name : '不明';
+            const dayName = DAYS[day];
+            const periodNum = period + 1;
+            const newSubject = this.store.getSubject(subjectId);
+            const newSubjectName = newSubject ? newSubject.name : '不明な科目';
+            const teacher = this.store.getTeacher(teacherId);
+            const teacherName = teacher ? teacher.name : '不明';
 
-            // 同じ科目が既に配置されているかチェック
-            const existingSlot = existingSlots.find(slot => slot.subjectId === subjectId);
+            // ★ スナップショットを使って競合チェック（削除処理後の状態ではなく削除前の状態で確認）
+            const snapshotSlots = preDeleteSnapshot[classId] || [];
 
             // 異なる科目が既に配置されているかチェック
-            const differentSubjectSlot = existingSlots.find(slot => slot.subjectId !== subjectId);
+            // ただし自分が削除予定の授業は競合対象から除外する
+            const differentSubjectSlot = snapshotSlots.find(slot => {
+                if (slot.subjectId === subjectId) return false;
+                // このteacherが担当していて、かつ削除予定（選択されていない）は除外
+                const ownedByTeacher = slot.teacherIds.includes(teacherId);
+                const beingRemoved = !selectedLessons.some(
+                    l => l.classId === classId && l.subjectId === slot.subjectId
+                );
+                if (ownedByTeacher && beingRemoved) return false;
+                return true;
+            });
 
             if (differentSubjectSlot) {
                 // 異なる科目が既に配置されている場合、確認ダイアログ
@@ -555,48 +581,59 @@ class LessonManager {
                     return t ? t.name : '不明';
                 }).join('・');
 
-                const newSubject = this.store.getSubject(subjectId);
-                const newSubjectName = newSubject ? newSubject.name : '不明な科目';
-                const teacher = this.store.getTeacher(teacherId);
-                const teacherName = teacher ? teacher.name : '不明';
-
-                const cls = CLASSES.find(c => c.id === classId);
-                const className = cls ? cls.name : '不明';
-                const dayName = DAYS[day];
-                const periodNum = period + 1;
-
-                const message = `【科目の重複確認】\n\n` +
+                const message = `【授業の競合】\n\n` +
                     `クラス: ${className}\n` +
-                    `時限: ${dayName}${periodNum}\n\n` +
-                    `既存の授業:\n` +
+                    `時限: ${dayName}${periodNum}限\n\n` +
+                    `既に配置されている授業:\n` +
                     `  科目: ${existingSubjectName}\n` +
                     `  担当: ${existingTeacherNames}\n\n` +
-                    `新しい授業:\n` +
+                    `新しく配置する授業:\n` +
                     `  科目: ${newSubjectName}\n` +
                     `  担当: ${teacherName}\n\n` +
-                    `同じ時限に異なる科目を配置することはできません。\n` +
                     `既存の授業を削除して新しい授業を配置しますか？`;
 
                 if (!confirm(message)) {
-                    continue; // この授業はスキップ
+                    continue; // キャンセル → この授業はスキップ
                 }
 
-                // 既存の授業を削除
+                // 既存の授業を削除してから配置
                 this.store.clearSlot(classId, day, period);
+                this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds, true);
+                registeredCount++;
+                continue;
             }
 
+            // 現在の実際のスロット状態を取得（削除後の最新状態）
+            const currentExistingSlots = this.store.getSlot(classId, day, period);
+            const existingSlot = currentExistingSlots.find(slot => slot.subjectId === subjectId);
+
             if (existingSlot) {
-                // 既に配置されている場合、教員を追加（TT）
+                // 同じ科目が既に配置されている場合
                 if (!existingSlot.teacherIds.includes(teacherId)) {
+                    // TT（複数教員）として追加 → 確認ダイアログ
+                    const existingTeacherNames = existingSlot.teacherIds.map(tid => {
+                        const t = this.store.getTeacher(tid);
+                        return t ? t.name : '不明';
+                    }).join('・');
+
+                    const message = `【TT（ティームティーチング）の確認】\n\n` +
+                        `クラス: ${className}\n` +
+                        `時限: ${dayName}${periodNum}限\n` +
+                        `科目: ${newSubjectName}\n\n` +
+                        `既に ${existingTeacherNames} が担当しています。\n` +
+                        `${teacherName} をTT教員として追加しますか？`;
+
+                    if (!confirm(message)) {
+                        continue; // キャンセル
+                    }
+
                     const newTeacherIds = [...existingSlot.teacherIds, teacherId];
-                    // 特別教室は新しく選択されたものを使用（ユーザーが変更した可能性があるため）
                     this.store.setSlot(classId, day, period, subjectId, newTeacherIds, specialClassroomIds);
                     registeredCount++;
                 } else {
                     // 既に同じ教員が配置されている場合でも、特別教室の選択を更新
                     this.store.setSlot(classId, day, period, subjectId, existingSlot.teacherIds, specialClassroomIds);
                 }
-                // 既に同じ教員が配置されている場合は何もしない
             } else {
                 // 新規配置
                 this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds, true);
