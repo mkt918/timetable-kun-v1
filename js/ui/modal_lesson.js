@@ -76,7 +76,19 @@ class LessonManager {
         if (assignments.length === 0) {
             listContainer.innerHTML = '<p class="placeholder-text">担当授業がありません</p>';
         } else {
-            const checkboxListHtml = assignments.map(lesson => {
+            // 科目名 → クラス名（1-1〜3-6順）でソート
+            const sortedAssignments = [...assignments].sort((a, b) => {
+                const subA = this.store.getSubject(a.subjectId)?.name || '';
+                const subB = this.store.getSubject(b.subjectId)?.name || '';
+                if (subA !== subB) return subA.localeCompare(subB, 'ja');
+                const clsA = CLASSES.find(c => c.id === a.classId);
+                const clsB = CLASSES.find(c => c.id === b.classId);
+                const gradeA = clsA?.grade ?? 99;
+                const gradeB = clsB?.grade ?? 99;
+                if (gradeA !== gradeB) return gradeA - gradeB;
+                return (clsA?.name || '').localeCompare(clsB?.name || '', 'ja');
+            });
+            const checkboxListHtml = sortedAssignments.map(lesson => {
                 const subject = this.store.getSubject(lesson.subjectId);
                 const className = CLASSES.find(c => c.id === lesson.classId)?.name || lesson.classId;
 

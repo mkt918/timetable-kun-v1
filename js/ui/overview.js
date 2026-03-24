@@ -1189,23 +1189,33 @@ class OverviewRenderer {
                 this.store.assignments.filter(a => a.teacherId === teacherId && a.subjectId === selectedSubjectId).map(a => a.classId)
             );
             const filterNote = sub.targetClass ? '（クラス指定）' : sub.grade ? `（${sub.grade}年生対象）` : '';
-            const tags = filteredClasses.map(c => {
-                const isActive = assignedClassIds.has(c.id);
-                return `
-                    <span class="asgn-class-tag" data-class-id="${escapeHtml(c.id)}"
-                          style="padding:5px 12px; border-radius:16px; cursor:pointer; font-size:0.88em; user-select:none;
-                                 background:${isActive ? '#4a6fa5' : '#f0f0f0'};
-                                 color:${isActive ? '#fff' : '#333'};
-                                 border:2px solid ${isActive ? '#3a5f95' : '#ddd'};">
-                        ${escapeHtml(c.name)}${isActive ? ' ✓' : ''}
-                    </span>
-                `;
+            // 学年ごとにグループ化してタグを生成
+            const gradeGroups = {};
+            filteredClasses.forEach(c => {
+                const g = c.grade || 0;
+                if (!gradeGroups[g]) gradeGroups[g] = [];
+                gradeGroups[g].push(c);
+            });
+            const gradeRows = Object.keys(gradeGroups).sort().map(g => {
+                const rowTags = gradeGroups[g].map(c => {
+                    const isActive = assignedClassIds.has(c.id);
+                    return `
+                        <span class="asgn-class-tag" data-class-id="${escapeHtml(c.id)}"
+                              style="padding:5px 12px; border-radius:16px; cursor:pointer; font-size:0.88em; user-select:none;
+                                     background:${isActive ? '#4a6fa5' : '#f0f0f0'};
+                                     color:${isActive ? '#fff' : '#333'};
+                                     border:2px solid ${isActive ? '#3a5f95' : '#ddd'};">
+                            ${escapeHtml(c.name)}${isActive ? ' ✓' : ''}
+                        </span>
+                    `;
+                }).join('');
+                return `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:4px;">${rowTags}</div>`;
             }).join('');
             return `
                 <div style="font-size:0.85em; color:#555; margin-bottom:8px;">
                     <strong>${escapeHtml(sub.name)}</strong>（${sub.credits || 1}単位/週）${escapeHtml(filterNote)} のクラスをクリックで担当設定:
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">${tags || '<span style="color:#aaa;">対象クラスがありません</span>'}</div>
+                ${gradeRows || '<span style="color:#aaa;">対象クラスがありません</span>'}
             `;
         };
 
