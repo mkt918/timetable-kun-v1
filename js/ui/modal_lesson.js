@@ -43,16 +43,33 @@ class LessonManager {
             </label>
         `).join('');
 
+        // 教室が選択済みの場合は展開状態にする
+        const hasRoomSelected = currentRoomIds.length > 0;
         const roomSelectHtml = `
             <div style="margin-top: 5px; margin-bottom: 5px;">
-                <label style="font-size: 0.9em; color: #666;">使用教室: </label>
-                <div id="room-checkboxes" style="display: inline-block;">
+                <div id="room-accordion-toggle" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 0.9em; color: #555; user-select: none;">
+                    <span id="room-accordion-arrow" style="font-size: 0.8em;">${hasRoomSelected ? '▼' : '▶'}</span>
+                    <span>使用教室${hasRoomSelected ? `（${currentRoomIds.length}件選択中）` : ''}</span>
+                </div>
+                <div id="room-accordion-body" style="display: ${hasRoomSelected ? 'block' : 'none'}; margin-top: 4px; padding: 6px 8px; background: #f8f8f8; border-radius: 4px;">
                     ${rooms.length > 0 ? roomCheckboxesHtml : '<span style="color: #999;">(教室未登録)</span>'}
                 </div>
             </div>
         `;
 
         infoContainer.innerHTML = `<div><strong>${escapeHtml(teacher?.name)}</strong> - ${DAYS[day]}曜 ${period + 1}限に授業を追加</div>` + roomSelectHtml;
+
+        // アコーディオンのトグル処理
+        const toggle = document.getElementById('room-accordion-toggle');
+        if (toggle) {
+            toggle.onclick = () => {
+                const body = document.getElementById('room-accordion-body');
+                const arrow = document.getElementById('room-accordion-arrow');
+                const isOpen = body.style.display !== 'none';
+                body.style.display = isOpen ? 'none' : 'block';
+                arrow.textContent = isOpen ? '▶' : '▼';
+            };
+        }
 
         const assignments = this.store.getTeacherAssignments(teacherId);
 
