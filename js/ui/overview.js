@@ -1280,22 +1280,12 @@ class OverviewRenderer {
                         a => a.teacherId === teacherId && a.subjectId === selectedSubjectId && a.classId === classId
                     );
                     if (existing) {
-                        // 担当削除 → 時間割からも除去
-                        this._removePlacedLessons(classId, teacherId, selectedSubjectId);
                         this.store.deleteAssignment(teacherId, selectedSubjectId, classId);
-                        showToast('担当と時間割配置を削除しました', 'success');
+                        showToast('担当を削除しました', 'success');
                     } else {
-                        // 担当追加 → 時間割に自動配置
                         const wh = sub ? (sub.credits || 1) : 1;
                         this.store.addAssignment(teacherId, selectedSubjectId, classId, wh);
-                        const result = this._autoPlaceLessons(classId, teacherId, selectedSubjectId, wh);
-                        if (result.placed === result.needed) {
-                            showToast(`${result.placed}コマを時間割に配置しました`, 'success');
-                        } else if (result.placed > 0) {
-                            showToast(`⚠ ${result.needed}コマ中${result.placed}コマのみ配置（空きスロット不足）`, 'warning');
-                        } else {
-                            showToast(`⚠ 空きスロットがないため配置できませんでした（週${result.needed}コマ必要）`, 'error');
-                        }
+                        showToast('担当を登録しました', 'success');
                     }
                     subjectArea.innerHTML = renderSubjectTags();
                     classArea.innerHTML   = renderClassPanel();

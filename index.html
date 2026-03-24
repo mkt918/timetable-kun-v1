@@ -156,10 +156,10 @@
                     </div>
                     <!-- 会議・業務タブ -->
                     <div id="master-meetings" class="master-pane hidden">
-                        <div class="meeting-layout" style="display: flex; gap: 20px;">
+                        <div class="meeting-layout" style="display: flex; gap: 20px; height: 100%; overflow: hidden;">
                             <!-- 左側: 会議・業務登録フォーム -->
                             <div class="meeting-form-panel"
-                                style="flex: 2; max-width: 600px; display: flex; flex-direction: column; padding-right: 8px;">
+                                style="flex: 2; max-width: 600px; display: flex; flex-direction: column; padding-right: 8px; min-height: 0;">
                                 <h4 style="flex-shrink: 0;">会議・業務を登録</h4>
                                 <div class="meeting-form" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-right: 4px;">
                                     <div class="form-group">
@@ -208,7 +208,7 @@
                             </div>
 
                             <!-- 右側: 登録済み会議・業務一覧 -->
-                            <div class="meeting-list-panel" style="flex: 1; max-height: 70vh; overflow-y: auto;">
+                            <div class="meeting-list-panel" style="flex: 1; overflow-y: auto; min-height: 0;">
                                 <div class="master-toolbar">
                                     <h4>登録済み会議・業務</h4>
                                     <button id="btn-delete-selected-meetings" class="btn btn-danger btn-sm">🗑️
