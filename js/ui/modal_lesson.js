@@ -109,13 +109,7 @@ class LessonManager {
         if (registerBtn) {
             registerBtn.onclick = () => {
                 const selectedCheckboxes = Array.from(document.querySelectorAll('.lesson-checkbox:checked'));
-                if (selectedCheckboxes.length === 0) {
-                    // 何も選択されていない場合は閉じる
-                    this.close();
-                    return;
-                }
-
-                // 選択された授業を配置
+                // チェックが0件でもregisterMultipleLessonsを呼び出してチェック外れた授業を削除する
                 this.registerMultipleLessons(teacherId, day, period, selectedCheckboxes);
             };
         }
@@ -248,7 +242,15 @@ class LessonManager {
         if (deleteBtn) {
             deleteBtn.onclick = () => {
                 if (confirm('この時限の授業を削除しますか？')) {
-                    this.store.clearSlot(classId, day, period);
+                    // 同一時限・同一教員のすべてのクラスのスロットを削除
+                    const teacherSlots = this.store.getTeacherTimetable(teacherId);
+                    const key = `${day}-${period}`;
+                    const slotsAtPeriod = teacherSlots[key] || [];
+                    if (slotsAtPeriod.length > 0) {
+                        slotsAtPeriod.forEach(slot => this.store.clearSlot(slot.classId, day, period));
+                    } else {
+                        this.store.clearSlot(classId, day, period);
+                    }
                     this.close();
                     this.ui.renderMainOverview();
                     this.ui.checkConflicts();
