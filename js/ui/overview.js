@@ -747,9 +747,10 @@ class OverviewRenderer {
                             const linkIndicator = linkedCount > 1
                                 ? `<span class="link-badge" title="連動: ${linkedCount}件">🔗</span>`
                                 : '';
+                            // 教員名は2文字に短縮
                             const teacherNames = slot.teacherIds.map(tid => {
                                 const t = this.store.getTeacher(tid);
-                                return t ? t.name : '不明';
+                                return t ? t.name.slice(0, 2) : '不明';
                             }).join('・');
 
                             // 使用教室表示（新形式: specialClassroomIds, 旧形式: specialClassroomId）
@@ -761,14 +762,14 @@ class OverviewRenderer {
                                     return r ? (r.shortName || r.name) : '';
                                 }).filter(n => n);
                                 if (names.length > 0) {
-                                    roomNames = `<span style="font-size:0.8em; color:#007bff;">@${escapeHtml(names.join('・'))}</span>`;
+                                    roomNames = `<span style="color:#007bff;">@${escapeHtml(names.join('・'))}</span>`;
                                 }
                             }
 
                             html += `
                                 <div class="cell-content-multi">
                                     <span class="cell-subject">${linkIndicator}${escapeHtml(subjectName)}</span>
-                                    <span class="cell-class">${escapeHtml(teacherNames)} ${roomNames}</span>
+                                    <div style="font-size:0.75em; color:#555; margin-top:1px; line-height:1.2;">${escapeHtml(teacherNames)} ${roomNames}</div>
                                 </div>
                             `;
                         });
