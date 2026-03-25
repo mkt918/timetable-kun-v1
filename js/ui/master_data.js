@@ -1197,16 +1197,44 @@ class MasterDataManager {
             let html = '';
             let currentGrade = null;
 
-            items.forEach(item => {
-                // 学年が変わったら改行
-                if (currentGrade !== null && item.grade !== currentGrade) {
+            // 科目が選択されている場合、classCurriculum に登録済みのクラスIDを取得
+            const curriculumClassIds = this.assignState.subjectId
+                ? this.store.classCurriculum
+                    .filter(c => c.subjectId === this.assignState.subjectId)
+                    .map(c => c.classId)
+                : null;
+
+            // カリキュラム登録済みクラスを先に、未登録を後に並べる
+            const sortedItems = curriculumClassIds
+                ? [
+                    ...items.filter(c => curriculumClassIds.includes(c.id)),
+                    ...items.filter(c => !curriculumClassIds.includes(c.id))
+                  ]
+                : items;
+
+            let shownUnregisteredHeader = false;
+
+            sortedItems.forEach(item => {
+                const inCurriculum = !curriculumClassIds || curriculumClassIds.includes(item.id);
+
+                // 未登録クラスの区切りヘッダー
+                if (curriculumClassIds && !inCurriculum && !shownUnregisteredHeader) {
+                    shownUnregisteredHeader = true;
+                    html += '<div style="flex-basis:100%; margin-top:6px; font-size:11px; color:#9ca3af; padding:2px 0;">── クラス別設定なし ──</div>';
+                    currentGrade = null;
+                }
+
+                // 学年が変わったら改行（登録済みクラス内のみ）
+                if (!shownUnregisteredHeader && currentGrade !== null && item.grade !== currentGrade) {
                     html += '<div style="flex-basis: 100%; height: 8px;"></div>';
                 }
                 currentGrade = item.grade;
 
+                const dimStyle = !inCurriculum ? 'opacity:0.45;' : '';
                 html += `
-                    <div class="tag-item ${selectedIds.includes(item.id) ? 'selected' : ''}" 
+                    <div class="tag-item ${selectedIds.includes(item.id) ? 'selected' : ''}"
                          data-id="${item.id}"
+                         style="${dimStyle}"
                          onclick="ui.masterData.handleAssignTagClick('${type}', '${item.id}')">
                         ${item.name}
                     </div>
