@@ -83,12 +83,9 @@ class OverviewRenderer {
     applyTableScale(scale) {
         this.tableScale = scale;
         localStorage.setItem('overview_table_scale', scale);
-        const table = document.getElementById('main-overview-table');
-        if (table) {
-            table.classList.remove('scale-xs', 'scale-sm', 'scale-md', 'scale-lg');
-            table.classList.add(`scale-${scale}`);
-        }
         this.updateScaleButtons();
+        // 確実に適用するため再レンダリング
+        this.render();
     }
 
     updateScaleButtons() {

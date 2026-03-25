@@ -23,6 +23,8 @@ class ClassTableRenderer {
         html += this.renderBody(classes);
 
         table.innerHTML = html;
+        // スケールクラスを適用
+        this.overview._applyScaleClass?.();
         this.attachEvents(table);
     }
 
