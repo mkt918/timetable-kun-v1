@@ -14,6 +14,7 @@ class OverviewRenderer {
         this._teacherTable = new TeacherTableRenderer(store, ui, this);
         this._classTable = new ClassTableRenderer(store, ui, this);
         this._dragDrop = new DragDropHandler(store, ui, this);
+        this._autoScheduleDialog = new AutoScheduleDialog(store, this);
     }
 
     init() {
@@ -77,6 +78,13 @@ class OverviewRenderer {
                 btn.onclick = () => this.applyTableScale(btn.dataset.scale);
             });
             this.updateScaleButtons();
+        }
+
+        // 自動配置ボタン（ツールバー右側に配置済み）
+        const btnAutoSchedule = document.getElementById('btn-auto-schedule');
+        if (btnAutoSchedule && !btnAutoSchedule._bound) {
+            btnAutoSchedule.addEventListener('click', () => this._autoScheduleDialog.open());
+            btnAutoSchedule._bound = true;
         }
     }
 
