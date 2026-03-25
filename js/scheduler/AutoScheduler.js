@@ -1,15 +1,20 @@
 /**
  * AutoScheduler - 自動時間割配置アルゴリズム
  *
- * classCurriculum（クラス別科目・週時間数）と
- * assignments（教員担当設定）を入力として、
- * 制約条件を満たしながら自動でコマを配置する。
+ * classCurriculum の設定（lessonType / consecutivePeriods / jointClassIds）を
+ * 実際のスケジューリングに反映する。
  *
- * 制約条件:
- *   - 同一クラスは同一時間帯に1授業のみ
- *   - 同一教員は同一時間帯に1授業のみ
- *   - 教員の勤務不可時間には配置しない
- *   - 教員の会議時間には配置しない
+ * ■ 対応する設定
+ *   - 通常 (normal)      : 1教員・1クラス・単独コマ
+ *   - TT                : assignments に登録された複数教員を同時配置
+ *   - 合同 (joint)      : jointClassIds の全クラスを同一スロットに配置
+ *   - 連続コマ          : consecutivePeriods 分を連続スロットとして1ブロック扱い
+ *
+ * ■ 制約条件
+ *   - 同一クラスは同一時間帯に1授業のみ（合同クラスすべて）
+ *   - 同一教員は同一時間帯に1授業のみ（TT全教員）
+ *   - 教員の勤務不可時間
+ *   - 教員の会議時間
  */
 class AutoScheduler {
     constructor(store) {
@@ -35,24 +40,17 @@ class AutoScheduler {
             dryRun = false
         } = options;
 
-        const result = {
-            placed: [],
-            unplaced: [],
-            warnings: []
-        };
+        const result = { placed: [], unplaced: [], warnings: [] };
 
-        // Undo用スナップショット（dryRun以外のとき）
-        if (!dryRun) {
-            this.store.snapshot();
-        }
+        if (!dryRun) this.store.snapshot();
 
-        // 既存スロットをクリア（clearFirst=true のとき）
+        // clearFirst: 対象クラス＋合同クラスをクリア
         if (clearFirst && !dryRun) {
-            for (const classId of targetClasses) {
+            const toClear = this._collectClearTargets(targetClasses);
+            for (const classId of toClear) {
                 for (let day = 0; day < DAYS.length; day++) {
                     for (let period = 0; period < PERIODS; period++) {
-                        const existing = this.store.getSlot(classId, day, period);
-                        if (existing.length > 0) {
+                        if (this.store.getSlot(classId, day, period).length > 0) {
                             this.store.clearSlot(classId, day, period);
                         }
                     }
@@ -60,53 +58,59 @@ class AutoScheduler {
             }
         }
 
-        // 現在の占有状態マップを構築
         const occupiedMap = this._buildOccupiedMap(targetClasses, clearFirst);
-
-        // タスクリスト生成
         const tasks = this._buildTasks(targetClasses, result, clearFirst, occupiedMap);
-
-        // 難易度順にソート（候補スロットが少ないものを先に）
         this._sortByDifficulty(tasks, occupiedMap);
 
-        // 各タスクにスロットを割り当て
         for (const task of tasks) {
             const candidates = this._findAvailableSlots(task, occupiedMap);
 
             if (candidates.length < task.count) {
+                const needed = task.count * task.consecutive;
+                const avail = candidates.length * task.consecutive;
+                const teacherLabel = task.teacherIds.map(t => this._teacherName(t)).join('・');
                 result.warnings.push(
                     `${this._className(task.classId)} ${this._subjectName(task.subjectId)}`
-                    + `（${this._teacherName(task.teacherId)}）:`
-                    + ` 空きコマ不足（必要${task.count}コマ、利用可能${candidates.length}コマ）`
+                    + `（${teacherLabel}）: 空き不足（必要${needed}コマ／利用可能${avail}コマ）`
                 );
             }
 
+            // avoidConsecutive は連続ブロック配置の場合は無効（意図的に連続させるため）
+            const useAvoidConsecutive = avoidConsecutive && task.consecutive === 1;
             const chosen = distribute
-                ? this._selectSlotsDistributed(candidates, task.count, task.classId, task.subjectId, occupiedMap, avoidConsecutive)
+                ? this._selectSlotsDistributed(candidates, task.count, task.classId, task.subjectId, occupiedMap, useAvoidConsecutive)
                 : candidates.slice(0, task.count);
 
-            // 配置実行
             for (const { day, period } of chosen) {
-                if (!dryRun) {
-                    this.store.setSlot(task.classId, day, period, task.subjectId, [task.teacherId]);
-                }
-                result.placed.push({ classId: task.classId, day, period, subjectId: task.subjectId, teacherId: task.teacherId });
+                // 連続ブロック分を一括配置
+                for (let p = period; p < period + task.consecutive && p < PERIODS; p++) {
+                    if (!dryRun) {
+                        for (const cid of task.allClassIds) {
+                            this.store.setSlot(cid, day, p, task.subjectId, task.teacherIds);
+                        }
+                    }
+                    result.placed.push({
+                        classId: task.classId, day, period: p,
+                        subjectId: task.subjectId, teacherIds: task.teacherIds
+                    });
 
-                // 占有マップを更新
-                const key = `${day}-${period}`;
-                occupiedMap.byClass[task.classId] = occupiedMap.byClass[task.classId] || new Set();
-                occupiedMap.byClass[task.classId].add(key);
-                occupiedMap.byTeacher[task.teacherId] = occupiedMap.byTeacher[task.teacherId] || new Set();
-                occupiedMap.byTeacher[task.teacherId].add(key);
+                    // 占有マップを更新（次のタスクの探索に使う）
+                    const key = `${day}-${p}`;
+                    for (const cid of task.allClassIds) {
+                        (occupiedMap.byClass[cid] = occupiedMap.byClass[cid] || new Set()).add(key);
+                    }
+                    for (const tid of task.teacherIds) {
+                        (occupiedMap.byTeacher[tid] = occupiedMap.byTeacher[tid] || new Set()).add(key);
+                    }
+                }
             }
 
-            // 不足分を unplaced に記録
-            const remaining = task.count - chosen.length;
+            const remaining = (task.count - chosen.length) * task.consecutive;
             if (remaining > 0) {
                 result.unplaced.push({
                     classId: task.classId,
                     subjectId: task.subjectId,
-                    teacherId: task.teacherId,
+                    teacherId: task.teacherIds[0],
                     remaining,
                     reason: '空きコマ不足'
                 });
@@ -117,33 +121,40 @@ class AutoScheduler {
     }
 
     // ──────────────────────────────────────────────────
-    // 内部ヘルパー
+    // タスク構築
     // ──────────────────────────────────────────────────
 
     /**
      * タスクリストを生成
-     * classCurriculum × assignments をマッチングし、
-     * 既に配置済みのコマ数を差し引いた残数を count に設定する
+     * TT / 合同 / 連続コマの設定を反映する
      */
     _buildTasks(targetClasses, result, clearFirst, occupiedMap) {
         const tasks = [];
+        // 合同授業で処理済みの "classId-subjectId" を記録
+        const handledJoint = new Set();
 
         for (const classId of targetClasses) {
             const curriculum = this.store.classCurriculum.filter(c => c.classId === classId);
 
             for (const cc of curriculum) {
-                // 担当教員を assignments から取得
-                const assignment = this.store.assignments.find(
+                const jkey = `${classId}-${cc.subjectId}`;
+                if (handledJoint.has(jkey)) continue; // 合同でもう処理済み
+
+                const lessonType  = cc.lessonType        || 'normal';
+                const consecutive = cc.consecutivePeriods || 1;
+                const jointIds    = (lessonType === 'joint' && (cc.jointClassIds || []).length > 0)
+                    ? cc.jointClassIds : [];
+                const allClassIds = [classId, ...jointIds];
+
+                // 担当教員
+                const assignments = this.store.assignments.filter(
                     a => a.classId === classId && a.subjectId === cc.subjectId
                 );
 
-                if (!assignment) {
+                if (assignments.length === 0) {
                     result.unplaced.push({
-                        classId,
-                        subjectId: cc.subjectId,
-                        teacherId: null,
-                        remaining: cc.weeklyHours,
-                        reason: '教員未設定'
+                        classId, subjectId: cc.subjectId, teacherId: null,
+                        remaining: cc.weeklyHours, reason: '教員未設定'
                     });
                     result.warnings.push(
                         `${this._className(classId)} ${this._subjectName(cc.subjectId)}: 担当教員が設定されていません`
@@ -151,20 +162,36 @@ class AutoScheduler {
                     continue;
                 }
 
-                let count = cc.weeklyHours;
+                // TT: assignments に登録された全教員、通常・合同: 先頭1人
+                const teacherIds = (lessonType === 'tt' && assignments.length > 1)
+                    ? assignments.map(a => a.teacherId)
+                    : [assignments[0].teacherId];
 
-                // clearFirst=false のとき、既に配置済みのコマを差し引く
+                // ブロック数（連続コマを1単位として計算）
+                let numBlocks = consecutive > 1
+                    ? Math.floor(cc.weeklyHours / consecutive)
+                    : cc.weeklyHours;
+
+                // 追加モード: 既配置を差し引く
                 if (!clearFirst) {
-                    const alreadyPlaced = this._countExistingLessons(classId, cc.subjectId, assignment.teacherId, occupiedMap);
-                    count = Math.max(0, cc.weeklyHours - alreadyPlaced);
+                    const placed      = this._countExistingLessons(classId, cc.subjectId, teacherIds[0]);
+                    const placedBlocks = consecutive > 1 ? Math.floor(placed / consecutive) : placed;
+                    numBlocks = Math.max(0, numBlocks - placedBlocks);
                 }
 
-                if (count > 0) {
+                if (numBlocks > 0) {
+                    if (jointIds.length > 0) {
+                        allClassIds.forEach(cid => handledJoint.add(`${cid}-${cc.subjectId}`));
+                    }
                     tasks.push({
                         classId,
                         subjectId: cc.subjectId,
-                        teacherId: assignment.teacherId,
-                        count
+                        teacherIds,
+                        teacherId: teacherIds[0],
+                        count: numBlocks,
+                        consecutive,
+                        allClassIds,
+                        lessonType
                     });
                 }
             }
@@ -182,74 +209,80 @@ class AutoScheduler {
             for (let period = 0; period < PERIODS; period++) {
                 const slots = this.store.getSlot(classId, day, period);
                 for (const s of slots) {
-                    if (s.subjectId === subjectId && s.teacherIds.includes(teacherId)) {
-                        count++;
-                    }
+                    if (s.subjectId === subjectId && s.teacherIds.includes(teacherId)) count++;
                 }
             }
         }
         return count;
     }
 
+    // ──────────────────────────────────────────────────
+    // スロット探索
+    // ──────────────────────────────────────────────────
+
     /**
      * タスクを難易度順（候補スロット数が少ない順）にソート
      */
     _sortByDifficulty(tasks, occupiedMap) {
-        tasks.sort((a, b) => {
-            const slotsA = this._findAvailableSlots(a, occupiedMap).length;
-            const slotsB = this._findAvailableSlots(b, occupiedMap).length;
-            return slotsA - slotsB;
-        });
+        tasks.sort((a, b) =>
+            this._findAvailableSlots(a, occupiedMap).length -
+            this._findAvailableSlots(b, occupiedMap).length
+        );
     }
 
     /**
-     * 配置可能なスロット一覧を返す
-     * 制約: クラス空き & 教員空き & 教員勤務可 & 会議なし
+     * 配置可能スロット（ブロックのアンカー）一覧を返す
+     * 連続コマの場合は先頭スロットだけを返し、N コマ分がすべて空きであることを確認する
      */
     _findAvailableSlots(task, occupiedMap) {
         const candidates = [];
-        const classOccupied = occupiedMap.byClass[task.classId] || new Set();
-        const teacherOccupied = occupiedMap.byTeacher[task.teacherId] || new Set();
-
         for (let day = 0; day < DAYS.length; day++) {
-            for (let period = 0; period < PERIODS; period++) {
-                const key = `${day}-${period}`;
-
-                // ① クラスが空いている
-                if (classOccupied.has(key)) continue;
-                // ② 教員が空いている
-                if (teacherOccupied.has(key)) continue;
-                // ③ 教員の勤務不可時間でない
-                if (this.store.isUnavailable(task.teacherId, day, period)) continue;
-                // ④ 教員に会議が入っていない
-                if (this._hasMeeting(task.teacherId, day, period)) continue;
-
-                candidates.push({ day, period });
+            for (let period = 0; period <= PERIODS - task.consecutive; period++) {
+                if (this._isBlockAvailable(task, day, period, occupiedMap)) {
+                    candidates.push({ day, period });
+                }
             }
         }
-
         return candidates;
     }
 
     /**
-     * 分散配置: 週内で同科目が曜日に偏らないようスロットを選ぶ
-     * 同じ曜日には同科目を重ねず、ラウンドロビンで選択する
+     * 指定スロットから task.consecutive コマが全クラス・全教員ともに空いているか確認
+     */
+    _isBlockAvailable(task, day, startPeriod, occupiedMap) {
+        for (let p = startPeriod; p < startPeriod + task.consecutive; p++) {
+            if (p >= PERIODS) return false;
+            const key = `${day}-${p}`;
+
+            for (const cid of task.allClassIds) {
+                if ((occupiedMap.byClass[cid] || new Set()).has(key)) return false;
+            }
+            for (const tid of task.teacherIds) {
+                if ((occupiedMap.byTeacher[tid] || new Set()).has(key)) return false;
+                if (this.store.isUnavailable(tid, day, p)) return false;
+                if (this._hasMeeting(tid, day, p)) return false;
+            }
+        }
+        return true;
+    }
+
+    // ──────────────────────────────────────────────────
+    // 分散配置
+    // ──────────────────────────────────────────────────
+
+    /**
+     * 週内で同科目が曜日に偏らないようスロットを選ぶ（ラウンドロビン）
      */
     _selectSlotsDistributed(candidates, count, classId, subjectId, occupiedMap, avoidConsecutive) {
         if (candidates.length === 0) return [];
         if (count >= candidates.length) return candidates.slice();
 
-        // 曜日ごとにグループ化
         const byDay = {};
         for (const slot of candidates) {
             if (!byDay[slot.day]) byDay[slot.day] = [];
             byDay[slot.day].push(slot);
         }
-
-        // 各曜日内を時限順にソート
-        for (const d of Object.keys(byDay)) {
-            byDay[d].sort((a, b) => a.period - b.period);
-        }
+        for (const d of Object.keys(byDay)) byDay[d].sort((a, b) => a.period - b.period);
 
         const dayOrder = Object.keys(byDay).map(Number).sort((a, b) => a - b);
         const chosen = [];
@@ -264,34 +297,26 @@ class AutoScheduler {
             const slotsForDay = byDay[day];
             if (!slotsForDay || slotsForDay.length === 0) continue;
 
-            // この曜日に既に同科目を選んでいないか確認（分散のため1曜日1コマを優先）
+            // まだ使っていない曜日がある間は1曜日1ブロックを優先
             const alreadyOnThisDay = chosen.filter(s => s.day === day).length;
             if (alreadyOnThisDay >= 1 && chosen.length < count - 1) {
-                // まだ埋めていない曜日がある場合は後回し
-                const availableDays = dayOrder.filter(d => !chosen.some(s => s.day === d));
-                if (availableDays.length > 0) continue;
+                const unusedDays = dayOrder.filter(d => !chosen.some(s => s.day === d));
+                if (unusedDays.length > 0) continue;
             }
 
-            // 連続授業回避（avoidConsecutive=true のとき）
             let slot = null;
             for (const candidate of slotsForDay) {
-                if (avoidConsecutive && this._isConsecutiveWithExisting(candidate, classId, subjectId, occupiedMap, chosen)) {
-                    continue;
-                }
+                if (avoidConsecutive && this._isConsecutiveWithExisting(candidate, classId, subjectId, occupiedMap, chosen)) continue;
                 slot = candidate;
                 break;
             }
-
-            if (!slot) {
-                // 連続回避できないなら先頭を使う
-                slot = slotsForDay[0];
-            }
+            if (!slot) slot = slotsForDay[0];
 
             chosen.push(slot);
             byDay[day] = slotsForDay.filter(s => s !== slot);
         }
 
-        // まだ足りない場合は残りの候補から補充
+        // 不足分を残りの候補から補充
         if (chosen.length < count) {
             for (const c of candidates) {
                 if (chosen.length >= count) break;
@@ -303,60 +328,66 @@ class AutoScheduler {
     }
 
     /**
-     * 連続授業チェック: 隣接コマ（前後）に同科目が既に配置されているか
+     * 隣接コマ（前後）に同科目が既に配置されているか確認
      */
     _isConsecutiveWithExisting(slot, classId, subjectId, occupiedMap, chosen) {
         const { day, period } = slot;
-
-        // chosen（今回配置予定）に隣接コマがあるか
         for (const s of chosen) {
             if (s.day === day && Math.abs(s.period - period) === 1) return true;
         }
-
-        // 既存の時間割に隣接コマがあるか
         if (period > 0) {
-            const prev = this.store.getSlot(classId, day, period - 1);
-            if (prev.some(s => s.subjectId === subjectId)) return true;
+            if (this.store.getSlot(classId, day, period - 1).some(s => s.subjectId === subjectId)) return true;
         }
         if (period < PERIODS - 1) {
-            const next = this.store.getSlot(classId, day, period + 1);
-            if (next.some(s => s.subjectId === subjectId)) return true;
+            if (this.store.getSlot(classId, day, period + 1).some(s => s.subjectId === subjectId)) return true;
         }
-
         return false;
+    }
+
+    // ──────────────────────────────────────────────────
+    // 占有マップ
+    // ──────────────────────────────────────────────────
+
+    /**
+     * clearFirst 時に対象とすべきクラスID集合を返す（合同クラスを含む）
+     */
+    _collectClearTargets(targetClasses) {
+        const toClear = new Set(targetClasses);
+        for (const classId of targetClasses) {
+            for (const cc of this.store.classCurriculum.filter(c => c.classId === classId)) {
+                if (cc.lessonType === 'joint') {
+                    (cc.jointClassIds || []).forEach(jid => toClear.add(jid));
+                }
+            }
+        }
+        return toClear;
     }
 
     /**
      * 現在の時間割状態から occupiedMap を構築
-     * clearFirst=true の場合、対象クラスは空として扱う
+     * clearFirst=true の場合、対象クラス（合同含む）は空として扱う
      */
     _buildOccupiedMap(targetClasses, clearFirst) {
-        const byClass = {};
+        const byClass  = {};
         const byTeacher = {};
-
-        const targetSet = new Set(targetClasses);
+        const clearSet = clearFirst ? this._collectClearTargets(targetClasses) : new Set();
 
         for (const cls of CLASSES) {
-            if (clearFirst && targetSet.has(cls.id)) {
-                // クリアするクラスは空として扱う
+            if (clearSet.has(cls.id)) {
                 byClass[cls.id] = new Set();
                 continue;
             }
 
             byClass[cls.id] = new Set();
-
             for (let day = 0; day < DAYS.length; day++) {
                 for (let period = 0; period < PERIODS; period++) {
                     const slots = this.store.getSlot(cls.id, day, period);
                     if (slots.length > 0) {
                         const key = `${day}-${period}`;
                         byClass[cls.id].add(key);
-
-                        // 教員の占有も記録（全クラスから）
                         for (const s of slots) {
                             for (const tid of (s.teacherIds || [])) {
-                                if (!byTeacher[tid]) byTeacher[tid] = new Set();
-                                byTeacher[tid].add(key);
+                                (byTeacher[tid] = byTeacher[tid] || new Set()).add(key);
                             }
                         }
                     }
@@ -367,15 +398,14 @@ class AutoScheduler {
         return { byClass, byTeacher };
     }
 
-    /**
-     * 教員が指定時間帯に会議を持つか確認
-     */
+    // ──────────────────────────────────────────────────
+    // 会議チェック
+    // ──────────────────────────────────────────────────
+
     _hasMeeting(teacherId, day, period) {
         for (const meeting of this.store.meetings) {
             if (!meeting.teacherIds.includes(teacherId)) continue;
             for (const s of (meeting.schedule || [])) {
-                // schedule の period は1始まりか0始まりか確認が必要
-                // data.js の会議定義を参照: period は表示上は1始まり、内部は0始まり
                 if (s.dayIndex === day && s.period === period) return true;
             }
         }

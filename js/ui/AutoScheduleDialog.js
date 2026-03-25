@@ -158,7 +158,9 @@ class AutoScheduleDialog {
     }
 
     _showStep2(result, options) {
-        const placedCount = result.placed.length;
+        // 合同授業は複数クラスに同じコマが置かれるが、ユニークな (classId,day,period) で数える
+        const uniquePlaced = new Set(result.placed.map(p => `${p.classId}-${p.day}-${p.period}`));
+        const placedCount = uniquePlaced.size;
         const unplacedCount = result.unplaced.reduce((s, u) => s + u.remaining, 0);
 
         let warningHtml = '';
