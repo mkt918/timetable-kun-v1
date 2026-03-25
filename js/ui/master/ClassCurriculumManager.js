@@ -214,7 +214,7 @@ class ClassCurriculumManager {
                             <span style="font-weight:700; font-size:0.85em; color:#1f2937;">${escapeHtml(catName)}</span>
                             <span style="font-size:0.78em; color:#9ca3af; margin-left:2px;">${items.length}科目・週${catHours}時間</span>
                         </div>
-                        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)); gap:10px;">
+                        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
                             ${cards}
                         </div>
                     </div>`;
