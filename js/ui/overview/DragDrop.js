@@ -308,12 +308,35 @@ class DragDropHandler {
                     const ttInfo = this.store.isTTSlot(classId, day, period);
                     const isJoint = ttInfo.isTT && (ttInfo.type === 'same_teacher' || ttInfo.type === 'both');
 
+                    // getSlot が classId を持たないため、各スロットに付与する
+                    let enrichedSlots;
+                    if (isJoint) {
+                        // 合同: 同じ教員・科目を持つ全クラスのスロットを収集
+                        enrichedSlots = [];
+                        slots.forEach(s => {
+                            (s.teacherIds || []).forEach(tid => {
+                                CLASSES.forEach(cls => {
+                                    const clsSlots = this.store.getSlot(cls.id, day, period);
+                                    clsSlots.forEach(cs => {
+                                        if (cs.teacherIds?.includes(tid) && cs.subjectId === s.subjectId) {
+                                            if (!enrichedSlots.some(es => es.classId === cls.id && es.subjectId === cs.subjectId)) {
+                                                enrichedSlots.push({ ...cs, classId: cls.id });
+                                            }
+                                        }
+                                    });
+                                });
+                            });
+                        });
+                    } else {
+                        enrichedSlots = slots.map(s => ({ ...s, classId }));
+                    }
+
                     this.draggedData = {
                         classId,
                         day,
                         period,
                         isJoint,
-                        slots: isJoint ? ttInfo.slots : slots,
+                        slots: enrichedSlots,
                         source: 'class'
                     };
                     e.dataTransfer.effectAllowed = 'move';
