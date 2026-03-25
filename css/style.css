@@ -522,6 +522,35 @@ body {
     font-size: var(--font-size-sm);
 }
 
+/* ── 表示サイズ制御 ── */
+.main-overview-table.scale-xs th,
+.main-overview-table.scale-xs td {
+    font-size: 0.6rem;
+    padding: 1px 2px;
+}
+.main-overview-table.scale-xs tbody td { min-width: 52px; height: 28px; }
+
+.main-overview-table.scale-sm th,
+.main-overview-table.scale-sm td {
+    font-size: 0.72rem;
+    padding: 2px 3px;
+}
+.main-overview-table.scale-sm tbody td { min-width: 68px; height: 38px; }
+
+.main-overview-table.scale-md th,
+.main-overview-table.scale-md td {
+    font-size: 0.875rem;
+    padding: 4px 6px;
+}
+.main-overview-table.scale-md tbody td { min-width: 100px; height: 50px; }
+
+.main-overview-table.scale-lg th,
+.main-overview-table.scale-lg td {
+    font-size: 1rem;
+    padding: 6px 10px;
+}
+.main-overview-table.scale-lg tbody td { min-width: 120px; height: 62px; }
+
 .main-overview-table thead th {
     background: var(--color-bg-tertiary);
     font-weight: 600;
@@ -2274,6 +2303,43 @@ body {
     color: var(--color-accent-primary);
     box-shadow: var(--shadow-sm);
     font-weight: bold;
+}
+
+/* スケールコントロール */
+.scale-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 10px;
+    padding-left: 10px;
+    border-left: 1px solid var(--color-border);
+}
+.scale-control-label {
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+    margin-right: 2px;
+    white-space: nowrap;
+}
+.btn-scale {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    padding: 1px 6px;
+    border-radius: var(--border-radius-sm);
+    color: var(--color-text-secondary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    line-height: 1.6;
+}
+.btn-scale.active {
+    background: var(--color-accent-primary);
+    border-color: var(--color-accent-primary);
+    color: white;
+    font-weight: bold;
+}
+.btn-scale:hover:not(.active) {
+    border-color: var(--color-accent-primary);
+    color: var(--color-accent-primary);
 }
 
 .btn-toggle:hover:not(.active) {

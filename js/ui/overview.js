@@ -7,6 +7,9 @@ class OverviewRenderer {
         this.mainFilterClassId = '';
         this.draggedData = null;
 
+        // 表示スケール（localStorage で永続化）
+        this.tableScale = localStorage.getItem('overview_table_scale') || 'sm';
+
         // 新モジュール初期化
         this._teacherTable = new TeacherTableRenderer(store, ui, this);
         this._classTable = new ClassTableRenderer(store, ui, this);
@@ -57,11 +60,41 @@ class OverviewRenderer {
                     <button id="btn-view-class" class="btn-toggle">全クラス</button>
                     <button id="btn-view-room" class="btn-toggle">特別教室</button>
                 </div>
+                <div class="scale-control">
+                    <span class="scale-control-label">サイズ</span>
+                    <button class="btn-scale" data-scale="xs">XS</button>
+                    <button class="btn-scale" data-scale="sm">S</button>
+                    <button class="btn-scale" data-scale="md">M</button>
+                    <button class="btn-scale" data-scale="lg">L</button>
+                </div>
             `;
             document.getElementById('btn-view-teacher').onclick = () => this.switchViewMode('teacher');
             document.getElementById('btn-view-class').onclick = () => this.switchViewMode('class');
             document.getElementById('btn-view-room').onclick = () => this.switchViewMode('room');
+
+            // スケールボタン
+            toolbarLeft.querySelectorAll('.btn-scale').forEach(btn => {
+                btn.onclick = () => this.applyTableScale(btn.dataset.scale);
+            });
+            this.updateScaleButtons();
         }
+    }
+
+    applyTableScale(scale) {
+        this.tableScale = scale;
+        localStorage.setItem('overview_table_scale', scale);
+        const table = document.getElementById('main-overview-table');
+        if (table) {
+            table.classList.remove('scale-xs', 'scale-sm', 'scale-md', 'scale-lg');
+            table.classList.add(`scale-${scale}`);
+        }
+        this.updateScaleButtons();
+    }
+
+    updateScaleButtons() {
+        document.querySelectorAll('.btn-scale').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.scale === this.tableScale);
+        });
     }
 
     switchViewMode(mode) {
@@ -72,6 +105,14 @@ class OverviewRenderer {
         document.getElementById('btn-view-room')?.classList.toggle('active', mode === 'room');
 
         this.render();
+    }
+
+    // テーブルにスケールクラスを適用（render後に呼ぶ）
+    _applyScaleClass() {
+        const table = document.getElementById('main-overview-table');
+        if (!table) return;
+        table.classList.remove('scale-xs', 'scale-sm', 'scale-md', 'scale-lg');
+        table.classList.add(`scale-${this.tableScale}`);
     }
 
     renderTeacherTimetable() {
@@ -319,6 +360,7 @@ class OverviewRenderer {
 
         html += '</tbody>';
         table.innerHTML = html;
+        this._applyScaleClass();
 
         this.attachTeacherTableEvents(table);
     }
@@ -794,6 +836,7 @@ class OverviewRenderer {
         });
         html += '</tbody>';
         table.innerHTML = html;
+        this._applyScaleClass();
 
         this.attachClassTableEvents(table);
     }
@@ -906,6 +949,7 @@ class OverviewRenderer {
         });
         html += '</tbody>';
         table.innerHTML = html;
+        this._applyScaleClass();
 
         // イベントリスナー（現在は表示のみ、ドラッグ移動は未実装）
         // 要望があればここに追加
