@@ -90,7 +90,12 @@ class ClassCurriculumManager {
         });
     }
 
-    // ─── 右パネル：カリキュラムテーブル ─────────────────────────────
+    // ─── 右パネル：カリキュラム（カードグリッド） ────────────────────
+
+    // 教科ごとのカラーパレット
+    static get CATEGORY_COLORS() {
+        return ['#4a6fa5', '#e05252', '#e09d33', '#3a9e6f', '#7c52a8', '#1aada4', '#c7623e', '#3580b1', '#a84c7a', '#6a7b2a'];
+    }
 
     renderCurriculumTable() {
         const panel = document.getElementById('curriculum-main-panel');
@@ -104,115 +109,158 @@ class ClassCurriculumManager {
         const cls = CLASSES.find(c => c.id === this.selectedClassId);
         const className = cls ? cls.name : this.selectedClassId;
         const curriculum = this.store.getClassCurriculum(this.selectedClassId);
-
-        // カリキュラムを教科でグループ化して表示
-        let tableHtml = '';
-        if (curriculum.length === 0) {
-            tableHtml = '<p style="color:#aaa; margin: 12px 0;">科目が登録されていません。「＋ 科目を追加」から追加してください。</p>';
-        } else {
-            // 教科でグループ化
-            const grouped = {};
-            curriculum.forEach(cc => {
-                const sub = this.store.getSubject(cc.subjectId);
-                const catId = sub ? sub.categoryId : '__unknown__';
-                const cat = this.store.categories.find(c => c.id === catId);
-                const catName = cat ? cat.name : '不明';
-                if (!grouped[catName]) grouped[catName] = [];
-                grouped[catName].push(cc);
-            });
-
-            tableHtml = Object.entries(grouped).map(([catName, items]) => {
-                const rows = items.map(cc => {
-                    const sub = this.store.getSubject(cc.subjectId);
-                    const subName = sub ? sub.name : '不明な科目';
-                    // 担当教員（assignments から取得）
-                    const teacherAssignments = this.store.assignments.filter(
-                        a => a.classId === this.selectedClassId && a.subjectId === cc.subjectId
-                    );
-                    let teacherHtml = '';
-                    if (teacherAssignments.length === 0) {
-                        teacherHtml = `<span style="color:#e67e22; font-size:0.85em;">未設定</span>`;
-                    } else {
-                        teacherHtml = teacherAssignments.map(a => {
-                            const t = this.store.getTeacher(a.teacherId);
-                            return `<span style="background:#e8f4e8; color:#2d6a2d; padding:1px 6px; border-radius:8px; font-size:0.82em; margin-right:3px;">${escapeHtml(t ? t.name : '?')}</span>`;
-                        }).join('');
-                    }
-
-                    const assignedLabel = teacherAssignments.length === 0
-                        ? `<button class="cc-btn-assign" data-id="${escapeHtml(cc.id)}" style="font-size:0.8em; padding:2px 8px; background:#e67e22; color:#fff; border:none; border-radius:4px; cursor:pointer;">教員を設定</button>`
-                        : `<button class="cc-btn-assign" data-id="${escapeHtml(cc.id)}" style="font-size:0.8em; padding:2px 8px; background:#4a6fa5; color:#fff; border:none; border-radius:4px; cursor:pointer;">変更</button>`;
-
-                    return `
-                        <tr style="border-bottom: 1px solid #f0f0f0;">
-                            <td style="padding: 8px 10px; font-size:0.9em;">${escapeHtml(subName)}</td>
-                            <td style="padding: 8px 6px; text-align:center;">
-                                <input type="number" class="cc-hours-input" data-id="${escapeHtml(cc.id)}"
-                                    value="${cc.weeklyHours}" min="1" max="20"
-                                    style="width:46px; text-align:center; border:1px solid #ddd; border-radius:4px; padding:2px;">
-                                <span style="font-size:0.8em; color:#666;">時間</span>
-                            </td>
-                            <td style="padding: 8px 6px;">${teacherHtml} ${assignedLabel}</td>
-                            <td style="padding: 8px 6px; text-align:right;">
-                                <button class="cc-btn-delete" data-id="${escapeHtml(cc.id)}"
-                                    style="font-size:0.8em; padding:2px 8px; background:#e74c3c; color:#fff; border:none; border-radius:4px; cursor:pointer;">削除</button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-
-                return `
-                    <div style="margin-bottom: 12px;">
-                        <div style="font-size:0.78em; font-weight:bold; color:#888; margin-bottom:4px; padding-bottom:2px; border-bottom:1px solid #e5e7eb;">${escapeHtml(catName)}</div>
-                        <table style="width:100%; border-collapse:collapse;">
-                            <thead>
-                                <tr style="background:#f8f9fa; font-size:0.8em; color:#666;">
-                                    <th style="padding:4px 10px; text-align:left; font-weight:normal;">科目</th>
-                                    <th style="padding:4px 6px; text-align:center; font-weight:normal;">週時間</th>
-                                    <th style="padding:4px 6px; text-align:left; font-weight:normal;">担当教員</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-                `;
-            }).join('');
-        }
-
         const totalHours = curriculum.reduce((s, cc) => s + (cc.weeklyHours || 0), 0);
         const assignedCount = curriculum.filter(cc =>
             this.store.assignments.some(a => a.classId === this.selectedClassId && a.subjectId === cc.subjectId)
         ).length;
 
+        // ─── カードセクション生成 ───────────────────────────────────
+        let cardsHtml = '';
+
+        if (curriculum.length === 0) {
+            cardsHtml = `
+                <div style="text-align:center; padding:48px 20px; color:#9ca3af;">
+                    <div style="font-size:2.5rem; margin-bottom:12px;">📋</div>
+                    <div style="font-size:0.95em; font-weight:500;">科目が登録されていません</div>
+                    <div style="font-size:0.82em; margin-top:6px;">「＋ 科目を追加」から登録してください</div>
+                </div>`;
+        } else {
+            // 教科でグループ化（登録順を維持）
+            const catOrder = [];
+            const grouped = {};
+            curriculum.forEach(cc => {
+                const sub = this.store.getSubject(cc.subjectId);
+                const catId = sub ? sub.categoryId : '__unknown__';
+                if (!grouped[catId]) {
+                    const cat = this.store.categories.find(c => c.id === catId);
+                    grouped[catId] = { catName: cat ? cat.name : '未分類', items: [] };
+                    catOrder.push(catId);
+                }
+                grouped[catId].items.push(cc);
+            });
+
+            const COLORS = ClassCurriculumManager.CATEGORY_COLORS;
+
+            cardsHtml = catOrder.map((catId, catIdx) => {
+                const { catName, items } = grouped[catId];
+                const color = COLORS[catIdx % COLORS.length];
+                const catHours = items.reduce((s, cc) => s + (cc.weeklyHours || 0), 0);
+
+                const cards = items.map(cc => {
+                    const sub = this.store.getSubject(cc.subjectId);
+                    const subName = sub ? sub.name : '不明な科目';
+
+                    const teacherAssignments = this.store.assignments.filter(
+                        a => a.classId === this.selectedClassId && a.subjectId === cc.subjectId
+                    );
+                    const hasTeacher = teacherAssignments.length > 0;
+
+                    const teacherChips = hasTeacher
+                        ? teacherAssignments.map(a => {
+                            const t = this.store.getTeacher(a.teacherId);
+                            return `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 9px; border-radius:20px; font-size:0.8em; font-weight:500; white-space:nowrap;">${escapeHtml(t ? t.name : '?')}</span>`;
+                        }).join('')
+                        : `<span style="color:#ef4444; font-size:0.82em; font-weight:600;">未設定</span>`;
+
+                    const assignBtnStyle = hasTeacher
+                        ? 'background:#f3f4f6; color:#374151; border:1px solid #e5e7eb;'
+                        : 'background:#ef4444; color:#fff; border:none;';
+                    const assignBtnLabel = hasTeacher ? '教員を変更' : '教員を設定';
+
+                    return `
+                        <div class="cc-card" style="
+                            background:#fff;
+                            border:1px solid #e5e7eb;
+                            border-top:3px solid ${color};
+                            border-radius:10px;
+                            padding:12px 14px;
+                            box-shadow:0 1px 4px rgba(0,0,0,0.06);
+                            display:flex;
+                            flex-direction:column;
+                            gap:8px;
+                        ">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
+                                <span style="font-weight:700; font-size:0.9em; color:#111827; line-height:1.35; flex:1;">${escapeHtml(subName)}</span>
+                                <div style="display:flex; align-items:center; gap:2px; background:#f3f4f6; border-radius:8px; padding:3px 8px; flex-shrink:0;">
+                                    <input type="number" class="cc-hours-input" data-id="${escapeHtml(cc.id)}"
+                                        value="${cc.weeklyHours}" min="1" max="20"
+                                        style="width:28px; text-align:center; border:none; background:transparent; font-weight:700; font-size:0.88em; color:#111827; padding:0; outline:none; -moz-appearance:textfield;">
+                                    <span style="font-size:0.75em; color:#6b7280; font-weight:500;">時間</span>
+                                </div>
+                            </div>
+
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; min-height:20px;">
+                                <span style="font-size:0.73em; color:#9ca3af; margin-right:2px; flex-shrink:0;">担当:</span>
+                                ${teacherChips}
+                            </div>
+
+                            <div style="display:flex; gap:5px; padding-top:2px; border-top:1px solid #f3f4f6;">
+                                <button class="cc-btn-assign" data-id="${escapeHtml(cc.id)}"
+                                    style="flex:1; font-size:0.78em; padding:5px 6px; border-radius:6px; cursor:pointer; font-weight:500; ${assignBtnStyle}">
+                                    ${assignBtnLabel}
+                                </button>
+                                <button class="cc-btn-delete" data-id="${escapeHtml(cc.id)}"
+                                    style="font-size:0.78em; padding:5px 10px; background:transparent; color:#9ca3af; border:1px solid #e5e7eb; border-radius:6px; cursor:pointer;">
+                                    削除
+                                </button>
+                            </div>
+                        </div>`;
+                }).join('');
+
+                return `
+                    <div style="margin-bottom:22px;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid ${color}20;">
+                            <div style="width:10px; height:10px; border-radius:3px; background:${color}; flex-shrink:0;"></div>
+                            <span style="font-weight:700; font-size:0.85em; color:#1f2937;">${escapeHtml(catName)}</span>
+                            <span style="font-size:0.78em; color:#9ca3af; margin-left:2px;">${items.length}科目・週${catHours}時間</span>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)); gap:10px;">
+                            ${cards}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        // ─── 合計バー ────────────────────────────────────────────────
+        const assignBadgeColor = curriculum.length === 0 ? '#6b7280'
+            : assignedCount === curriculum.length ? '#16a34a' : '#ef4444';
+
         panel.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h4 style="margin:0; font-size:1em;">${escapeHtml(className)} のカリキュラム</h4>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <h4 style="margin:0 0 3px; font-size:1em; font-weight:700; color:#111827;">${escapeHtml(className)} のカリキュラム</h4>
+                    <div style="display:flex; align-items:center; gap:10px; font-size:0.8em; flex-wrap:wrap;">
+                        <span style="color:#6b7280;">${curriculum.length} 科目</span>
+                        <span style="color:#6b7280;">週合計
+                            <strong style="color:#111827; font-size:1.05em;">${totalHours}</strong>
+                            <span style="font-size:0.9em;">時間</span>
+                        </span>
+                        <span style="color:${assignBadgeColor}; font-weight:600;">
+                            教員設定 ${assignedCount}/${curriculum.length}
+                        </span>
+                    </div>
+                </div>
                 <div style="display:flex; gap:8px;">
-                    <button id="cc-btn-bulk" class="btn btn-secondary" style="font-size:0.85em;">
+                    <button id="cc-btn-bulk" class="btn btn-secondary" style="font-size:0.82em;">
                         📋 ${this.selectedGrade}年一括設定
                     </button>
-                    <button id="cc-btn-add" class="btn btn-accent" style="font-size:0.85em;">
+                    <button id="cc-btn-add" class="btn btn-accent" style="font-size:0.82em;">
                         ＋ 科目を追加
                     </button>
                 </div>
             </div>
-            <div style="font-size:0.82em; color:#555; margin-bottom:12px; display:flex; gap:16px;">
-                <span>登録科目: <strong>${curriculum.length}件</strong></span>
-                <span>週合計: <strong>${totalHours}時間</strong></span>
-                <span>教員割当済: <strong>${assignedCount}/${curriculum.length}件</strong></span>
-            </div>
-            <div id="cc-table-body">
-                ${tableHtml}
+
+            <div id="cc-table-body" style="overflow-y:auto;">
+                ${cardsHtml}
             </div>
         `;
 
-        // ＋科目追加ボタン
+        // ─── イベント接続 ─────────────────────────────────────────────
+
         document.getElementById('cc-btn-add')?.addEventListener('click', () => {
             this.openAddDialog(this.selectedClassId);
         });
 
-        // 学年一括設定ボタン
         document.getElementById('cc-btn-bulk')?.addEventListener('click', () => {
             this.openGradeBulkDialog(this.selectedGrade);
         });
@@ -224,9 +272,8 @@ class ClassCurriculumManager {
                 const val = parseInt(input.value);
                 if (val >= 1 && val <= 20) {
                     this.store.updateClassCurriculum(id, val);
-                    this.renderClassList(); // サマリー更新
+                    this.renderClassList();
                 } else {
-                    // 範囲外は元に戻す
                     const cc = this.store.classCurriculum.find(c => c.id === id);
                     if (cc) input.value = cc.weeklyHours;
                 }
