@@ -815,6 +815,27 @@ class DataStore {
         return { success: true };
     }
 
+    /**
+     * クラスカリキュラムの授業形態オプションを更新
+     * @param {string} id
+     * @param {{ consecutivePeriods?: number, lessonType?: string, jointClassIds?: string[] }} options
+     */
+    updateClassCurriculumOptions(id, options) {
+        const item = this.classCurriculum.find(c => c.id === id);
+        if (!item) return { success: false };
+        if (options.consecutivePeriods !== undefined) {
+            item.consecutivePeriods = Math.max(1, parseInt(options.consecutivePeriods) || 1);
+        }
+        if (options.lessonType !== undefined) {
+            item.lessonType = options.lessonType;
+        }
+        if (options.jointClassIds !== undefined) {
+            item.jointClassIds = options.jointClassIds;
+        }
+        this.saveToStorage();
+        return { success: true };
+    }
+
     // ══════════════════════════════════════════════════════════
     // ■ セクション2.5: パーキングエリア（一時保管場所）
     // ══════════════════════════════════════════════════════════

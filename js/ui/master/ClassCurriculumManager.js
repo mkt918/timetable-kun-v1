@@ -167,6 +167,60 @@ class ClassCurriculumManager {
                         : 'background:#ef4444; color:#fff; border:none;';
                     const assignBtnLabel = hasTeacher ? '教員を変更' : '教員を設定';
 
+                    // 授業形態オプション（デフォルト値を補完）
+                    const consecutive = cc.consecutivePeriods || 1;
+                    const lessonType = cc.lessonType || 'normal';
+                    const jointIds = cc.jointClassIds || [];
+
+                    // 連続バッジ
+                    const consBadge = consecutive > 1
+                        ? `<span style="background:#fef3c7; color:#92400e; font-size:0.72em; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;">${consecutive}連</span>`
+                        : '';
+
+                    // 授業形態バッジ
+                    const typeBadgeMap = {
+                        tt:    'background:#f3e8ff; color:#6b21a8;',
+                        joint: 'background:#d1fae5; color:#065f46;'
+                    };
+                    const typeLabelMap = { normal: '', tt: 'TT', joint: '合同' };
+                    const typeBadge = lessonType !== 'normal'
+                        ? `<span style="${typeBadgeMap[lessonType]} font-size:0.72em; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;">${typeLabelMap[lessonType]}</span>`
+                        : '';
+
+                    // 連続コマ選択肢
+                    const consOptions = [1,2,3,4].map(n =>
+                        `<option value="${n}" ${consecutive === n ? 'selected' : ''}>${n === 1 ? '連続なし' : `${n}コマ連続`}</option>`
+                    ).join('');
+
+                    // 授業形態選択肢
+                    const typeOptions = [
+                        ['normal', '通常'],
+                        ['tt', 'TT（複数教員）'],
+                        ['joint', '合同（複数クラス）']
+                    ].map(([v, l]) =>
+                        `<option value="${v}" ${lessonType === v ? 'selected' : ''}>${l}</option>`
+                    ).join('');
+
+                    // 合同クラスチップ
+                    const jointChips = lessonType === 'joint'
+                        ? `<div style="display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; align-items:center;">
+                            <span style="font-size:0.72em; color:#9ca3af; flex-shrink:0;">合同:</span>
+                            ${jointIds.length > 0
+                                ? jointIds.map(jid => {
+                                    const jcls = CLASSES.find(c => c.id === jid);
+                                    return `<span style="background:#d1fae5; color:#065f46; font-size:0.75em; padding:1px 7px; border-radius:12px; font-weight:500;">${escapeHtml(jcls ? jcls.name : jid)}</span>`;
+                                }).join('')
+                                : '<span style="color:#f59e0b; font-size:0.78em; font-weight:600;">未選択</span>'
+                            }
+                            <button class="cc-btn-joint" data-id="${escapeHtml(cc.id)}"
+                                style="font-size:0.72em; padding:1px 7px; background:#ecfdf5; color:#059669; border:1px solid #6ee7b7; border-radius:4px; cursor:pointer;">
+                                設定
+                            </button>
+                           </div>`
+                        : '';
+
+                    const selectStyle = 'font-size:0.75em; border:1px solid #e5e7eb; border-radius:5px; padding:2px 4px; background:#f9fafb; color:#374151; cursor:pointer; max-width:100%;';
+
                     return `
                         <div class="cc-card" style="
                             background:#fff;
@@ -177,10 +231,14 @@ class ClassCurriculumManager {
                             box-shadow:0 1px 4px rgba(0,0,0,0.06);
                             display:flex;
                             flex-direction:column;
-                            gap:8px;
+                            gap:7px;
                         ">
+                            <!-- 科目名 + 週時間 + バッジ -->
                             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
-                                <span style="font-weight:700; font-size:0.9em; color:#111827; line-height:1.35; flex:1;">${escapeHtml(subName)}</span>
+                                <div style="flex:1; min-width:0;">
+                                    <span style="font-weight:700; font-size:0.9em; color:#111827; line-height:1.35;">${escapeHtml(subName)}</span>
+                                    ${consBadge}${typeBadge}
+                                </div>
                                 <div style="display:flex; align-items:center; gap:2px; background:#f3f4f6; border-radius:8px; padding:3px 8px; flex-shrink:0;">
                                     <input type="number" class="cc-hours-input" data-id="${escapeHtml(cc.id)}"
                                         value="${cc.weeklyHours}" min="1" max="20"
@@ -189,12 +247,27 @@ class ClassCurriculumManager {
                                 </div>
                             </div>
 
+                            <!-- 担当教員 -->
                             <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center; min-height:20px;">
                                 <span style="font-size:0.73em; color:#9ca3af; margin-right:2px; flex-shrink:0;">担当:</span>
                                 ${teacherChips}
                             </div>
 
-                            <div style="display:flex; gap:5px; padding-top:2px; border-top:1px solid #f3f4f6;">
+                            <!-- 授業形態設定 -->
+                            <div style="display:flex; flex-direction:column; gap:4px; padding:6px 0; border-top:1px solid #f3f4f6; border-bottom:1px solid #f3f4f6;">
+                                <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                    <select class="cc-consecutive-select" data-id="${escapeHtml(cc.id)}" style="${selectStyle}">
+                                        ${consOptions}
+                                    </select>
+                                    <select class="cc-lesson-type-select" data-id="${escapeHtml(cc.id)}" style="${selectStyle}">
+                                        ${typeOptions}
+                                    </select>
+                                </div>
+                                ${jointChips}
+                            </div>
+
+                            <!-- アクションボタン -->
+                            <div style="display:flex; gap:5px;">
                                 <button class="cc-btn-assign" data-id="${escapeHtml(cc.id)}"
                                     style="flex:1; font-size:0.78em; padding:5px 6px; border-radius:6px; cursor:pointer; font-weight:500; ${assignBtnStyle}">
                                     ${assignBtnLabel}
@@ -301,6 +374,125 @@ class ClassCurriculumManager {
                 showToast('削除しました', 'success');
             };
         });
+
+        // 連続コマ変更
+        panel.querySelectorAll('.cc-consecutive-select').forEach(sel => {
+            sel.onchange = () => {
+                this.store.updateClassCurriculumOptions(sel.dataset.id, {
+                    consecutivePeriods: parseInt(sel.value)
+                });
+                this.renderCurriculumTable();
+            };
+        });
+
+        // 授業形態変更
+        panel.querySelectorAll('.cc-lesson-type-select').forEach(sel => {
+            sel.onchange = () => {
+                const newType = sel.value;
+                const cc = this.store.classCurriculum.find(c => c.id === sel.dataset.id);
+                if (!cc) return;
+                // 合同以外に切り替えたら jointClassIds をリセット
+                const jointClassIds = newType === 'joint' ? (cc.jointClassIds || []) : [];
+                this.store.updateClassCurriculumOptions(sel.dataset.id, {
+                    lessonType: newType,
+                    jointClassIds
+                });
+                this.renderCurriculumTable();
+                // 合同に切り替えたら即ダイアログを開く
+                if (newType === 'joint') {
+                    const updated = this.store.classCurriculum.find(c => c.id === sel.dataset.id);
+                    if (updated) this.openJointClassDialog(updated);
+                }
+            };
+        });
+
+        // 合同クラス設定ボタン
+        panel.querySelectorAll('.cc-btn-joint').forEach(btn => {
+            btn.onclick = () => {
+                const cc = this.store.classCurriculum.find(c => c.id === btn.dataset.id);
+                if (cc) this.openJointClassDialog(cc);
+            };
+        });
+    }
+
+    // ─── 合同クラス選択ダイアログ ────────────────────────────────────
+
+    openJointClassDialog(cc) {
+        const cls = CLASSES.find(c => c.id === cc.classId);
+        const sub = this.store.getSubject(cc.subjectId);
+        const className = cls ? cls.name : cc.classId;
+        const subName = sub ? sub.name : '不明';
+
+        // 同じ学年の他クラスが候補
+        const candidates = CLASSES.filter(c => c.grade === cls?.grade && c.id !== cc.classId);
+        const currentIds = new Set(cc.jointClassIds || []);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay';
+
+        const render = () => {
+            const items = candidates.map(c => {
+                const checked = currentIds.has(c.id);
+                return `
+                    <label class="cc-joint-row" data-class-id="${escapeHtml(c.id)}"
+                        style="display:flex; align-items:center; gap:10px; padding:8px 12px; margin:2px 0;
+                               border-radius:7px; cursor:pointer; border:1px solid ${checked ? '#6ee7b7' : '#e5e7eb'};
+                               background:${checked ? '#ecfdf5' : '#fff'};">
+                        <input type="checkbox" ${checked ? 'checked' : ''} style="accent-color:#059669; width:16px; height:16px; cursor:pointer;">
+                        <span style="font-size:0.9em; font-weight:${checked ? '600' : '400'}; color:${checked ? '#065f46' : '#374151'};">${escapeHtml(c.name)}</span>
+                        ${checked ? '<span style="margin-left:auto; font-size:0.75em; color:#059669; font-weight:600;">合同</span>' : ''}
+                    </label>
+                `;
+            }).join('') || '<p style="color:#aaa; text-align:center; padding:16px;">同学年の他クラスがありません</p>';
+
+            overlay.innerHTML = `
+                <div class="dialog-content" style="width:340px; max-width:90vw;">
+                    <h3 style="margin:0 0 4px; font-size:1em; font-weight:700;">合同クラスを選択</h3>
+                    <p style="margin:0 0 14px; font-size:0.82em; color:#6b7280;">
+                        ${escapeHtml(className)} の「${escapeHtml(subName)}」に合同参加するクラスを選んでください
+                    </p>
+                    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:6px; max-height:300px; overflow-y:auto;">
+                        ${items}
+                    </div>
+                    <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
+                        <button id="cc-joint-cancel" class="btn btn-secondary">キャンセル</button>
+                        <button id="cc-joint-ok" class="btn btn-primary">保存</button>
+                    </div>
+                </div>
+            `;
+
+            overlay.querySelectorAll('.cc-joint-row').forEach(row => {
+                row.onclick = (e) => {
+                    if (e.target.tagName === 'INPUT') return; // チェックボックス直接クリックは通常動作
+                    const cb = row.querySelector('input[type=checkbox]');
+                    cb.checked = !cb.checked;
+                    const cid = row.dataset.classId;
+                    if (cb.checked) currentIds.add(cid);
+                    else currentIds.delete(cid);
+                    render();
+                };
+                const cb = row.querySelector('input[type=checkbox]');
+                cb.onchange = () => {
+                    const cid = row.dataset.classId;
+                    if (cb.checked) currentIds.add(cid);
+                    else currentIds.delete(cid);
+                };
+            });
+
+            overlay.querySelector('#cc-joint-cancel').onclick = () => overlay.remove();
+            overlay.querySelector('#cc-joint-ok').onclick = () => {
+                this.store.updateClassCurriculumOptions(cc.id, {
+                    jointClassIds: [...currentIds]
+                });
+                overlay.remove();
+                this.renderCurriculumTable();
+                showToast('合同クラスを保存しました', 'success');
+            };
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        };
+
+        render();
+        document.body.appendChild(overlay);
     }
 
     // ─── 科目追加ダイアログ ──────────────────────────────────────────
