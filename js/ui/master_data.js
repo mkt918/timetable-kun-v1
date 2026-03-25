@@ -18,6 +18,7 @@ class MasterDataManager {
         this._subjectManager = new SubjectManager(store, ui, this);
         this._roomManager = new RoomManager(store, ui, this);
         this._meetingManager = new MeetingManager(store, ui, this);
+        this._curriculumManager = new ClassCurriculumManager(store, ui, this);
     }
 
     openModal() {
@@ -75,6 +76,8 @@ class MasterDataManager {
         } else if (tabName === 'meetings') {
             this.renderMeetingForm();
             this.renderMeetings();
+        } else if (tabName === 'curriculum') {
+            this._curriculumManager.render();
         } else if (tabName === 'settings') {
             this.renderSettings();
         }

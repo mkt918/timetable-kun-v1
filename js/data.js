@@ -45,6 +45,9 @@ class DataStore {
         // 選択授業グループ: [{ id, name, color, subjectIds }]
         this.electiveGroups = [];
 
+        // クラス別カリキュラム: [{ id, classId, subjectId, weeklyHours }]
+        this.classCurriculum = [];
+
         // 設定データ
         this.settings = {
             periods: 7,
@@ -235,6 +238,17 @@ class DataStore {
                 }
             }
 
+            // クラス別カリキュラム読み込み
+            const classCurriculum = localStorage.getItem(STORAGE_KEYS.CLASS_CURRICULUM);
+            if (classCurriculum) {
+                try {
+                    this.classCurriculum = JSON.parse(classCurriculum) || [];
+                } catch (e) {
+                    console.error('Failed to parse classCurriculum', e);
+                    this.classCurriculum = [];
+                }
+            }
+
             if (timetable) {
                 this.timetable = JSON.parse(timetable);
                 // データ構造のマイグレーション（Object -> Array）
@@ -408,6 +422,8 @@ class DataStore {
             localStorage.setItem(STORAGE_KEYS.LINKED_GROUPS, JSON.stringify(this.linkedGroups));
             // パーキングエリアも保存
             localStorage.setItem(STORAGE_KEYS.PARKING_AREA, JSON.stringify(this.parkingArea));
+            // クラス別カリキュラムも保存
+            localStorage.setItem(STORAGE_KEYS.CLASS_CURRICULUM, JSON.stringify(this.classCurriculum));
 
             // 容量使用率チェック（80%超過で警告）
             const usageKB = this._getStorageUsageKB();
@@ -735,6 +751,68 @@ class DataStore {
      */
     getTeacherAssignments(teacherId) {
         return this.assignments.filter(a => a.teacherId === teacherId);
+    }
+
+    // ==========================================
+    // クラス別カリキュラム管理
+    // ==========================================
+
+    /**
+     * クラスにカリキュラム科目を追加
+     */
+    addClassCurriculum(classId, subjectId, weeklyHours) {
+        const existing = this.classCurriculum.find(
+            c => c.classId === classId && c.subjectId === subjectId
+        );
+        if (existing) return { success: false, message: '既に登録済みです' };
+        this.classCurriculum.push({
+            id: `cc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            classId,
+            subjectId,
+            weeklyHours: parseInt(weeklyHours) || 1
+        });
+        this.saveToStorage();
+        return { success: true };
+    }
+
+    /**
+     * クラスカリキュラムを削除（関連する assignments も削除）
+     */
+    deleteClassCurriculum(id) {
+        const item = this.classCurriculum.find(c => c.id === id);
+        if (!item) return { success: false };
+        const { classId, subjectId } = item;
+        // 関連する担当割当も削除
+        this.assignments = this.assignments.filter(
+            a => !(a.classId === classId && a.subjectId === subjectId)
+        );
+        this.classCurriculum = this.classCurriculum.filter(c => c.id !== id);
+        this.saveToStorage();
+        return { success: true };
+    }
+
+    /**
+     * クラスのカリキュラム一覧を取得
+     */
+    getClassCurriculum(classId) {
+        return this.classCurriculum.filter(c => c.classId === classId);
+    }
+
+    /**
+     * クラスカリキュラムの週時間数を更新
+     */
+    updateClassCurriculum(id, weeklyHours) {
+        const item = this.classCurriculum.find(c => c.id === id);
+        if (!item) return { success: false };
+        item.weeklyHours = parseInt(weeklyHours) || 1;
+        // 対応する assignments の weeklyHours も更新
+        this.assignments.forEach(a => {
+            if (a.classId === item.classId && a.subjectId === item.subjectId) {
+                a.weeklyHours = item.weeklyHours;
+            }
+        });
+        this.saveToStorage();
+        return { success: true };
     }
 
     // ══════════════════════════════════════════════════════════

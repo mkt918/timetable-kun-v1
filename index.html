@@ -127,6 +127,7 @@
                     <button class="master-tab" data-tab="subjects">📚 教科・科目</button>
                     <button class="master-tab" data-tab="rooms">🏫 特別教室</button>
                     <button class="master-tab" data-tab="meetings">📅 会議・業務</button>
+                    <button class="master-tab" data-tab="curriculum">📋 クラス別設定</button>
                     <button class="master-tab" data-tab="settings">⚙️ 設定</button>
                 </div>
                 <div class="master-content">
@@ -243,6 +244,17 @@
                                 <div class="card-grid" id="subject-cards">
                                     <!-- 科目カードが動的に生成される -->
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- クラス別設定タブ -->
+                    <div id="master-curriculum" class="master-pane hidden">
+                        <div style="display:flex; gap:16px; height:100%; overflow:hidden;">
+                            <div id="curriculum-class-panel" style="width:180px; flex-shrink:0; overflow-y:auto; border-right:1px solid #e5e7eb; padding-right:12px;">
+                                <!-- 左パネル（学年タブ + クラスリスト）→ JS で生成 -->
+                            </div>
+                            <div id="curriculum-main-panel" style="flex:1; overflow-y:auto;">
+                                <!-- 右パネル（カリキュラムテーブル）→ JS で生成 -->
                             </div>
                         </div>
                     </div>
@@ -486,6 +498,7 @@
     <script src="js/ui/master/SubjectManager.js"></script>
     <script src="js/ui/master/RoomManager.js"></script>
     <script src="js/ui/master/MeetingManager.js"></script>
+    <script src="js/ui/master/ClassCurriculumManager.js"></script>
     <!-- Refactored UI Modules -->
     <script src="js/ui/overview.js"></script>
     <script src="js/ui/master_data.js"></script>
