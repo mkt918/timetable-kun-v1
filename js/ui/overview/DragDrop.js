@@ -91,22 +91,69 @@ class DragDropHandler {
             this.store.clearLinkedLessons(draggedSlot.classId, toDay, toPeriod);
         }
 
-        // 移動先に既存の授業があるかチェック
-        const toTeacherId = td.dataset.teacherId;
-        if (toTeacherId) {
-            const toTeacherSlots = this.store.getTeacherTimetable(toTeacherId);
-            const toKey = `${toDay}-${toPeriod}`;
-            const existingSlots = toTeacherSlots[toKey] || [];
+        // 移動先クラスに既存授業があるかチェック（他教員の授業が消える可能性）
+        const classExisting = this.store.getSlot(draggedSlot.classId, toDay, toPeriod);
+        if (classExisting.length > 0) {
+            if (!this.confirmClassSlotOverwrite(draggedSlot, classExisting[0], toDay, toPeriod)) {
+                return;
+            }
+        } else {
+            // 移動先教員のスロットをチェック（クラス競合がない場合のみ）
+            const toTeacherId = td.dataset.teacherId;
+            if (toTeacherId) {
+                const toTeacherSlots = this.store.getTeacherTimetable(toTeacherId);
+                const toKey = `${toDay}-${toPeriod}`;
+                const existingSlots = toTeacherSlots[toKey] || [];
 
-            if (existingSlots.length > 0 && !this.draggedData.isJoint) {
-                if (!this.handleExistingSlotConflict(existingSlots, draggedSlot, toDay, toPeriod)) {
-                    return;
+                if (existingSlots.length > 0 && !this.draggedData.isJoint) {
+                    if (!this.handleExistingSlotConflict(existingSlots, draggedSlot, toDay, toPeriod)) {
+                        return;
+                    }
                 }
             }
         }
 
         // 移動実行
         this.executeMove(draggedSlot, toDay, toPeriod);
+    }
+
+    /**
+     * 移動先クラスに既存授業がある場合の確認ダイアログ
+     */
+    confirmClassSlotOverwrite(draggedSlot, existing, toDay, toPeriod) {
+        const cls = CLASSES.find(c => c.id === draggedSlot.classId);
+        const className = cls ? cls.name : '不明';
+        const dayName = DAYS[toDay];
+        const periodNum = toPeriod + 1;
+        const existingSubject = this.store.getSubject(existing.subjectId);
+        const existingTeacherNames = (existing.teacherIds || [])
+            .map(tid => { const t = this.store.getTeacher(tid); return t ? t.name : '不明'; })
+            .join('・');
+        const newSubject = this.store.getSubject(draggedSlot.subjectId);
+        const newTeacherNames = (draggedSlot.teacherIds || [])
+            .map(tid => { const t = this.store.getTeacher(tid); return t ? t.name : '不明'; })
+            .join('・');
+
+        if (existing.subjectId === draggedSlot.subjectId) {
+            // 同じ科目 → TT確認
+            const hasSameTeacher = (draggedSlot.teacherIds || []).some(tid =>
+                (existing.teacherIds || []).includes(tid)
+            );
+            if (hasSameTeacher) return true; // 同一教員なら確認不要
+            const message = `【TT（チームティーチング）の確認】\n\n` +
+                `${className} ${dayName}${periodNum}限\n\n` +
+                `既存の授業:\n  科目: ${existingSubject?.name || '不明'}\n  担当: ${existingTeacherNames}\n\n` +
+                `この授業にTTとして追加しますか？`;
+            return confirm(message);
+        } else {
+            // 異なる科目 → 上書き確認
+            const message = `【クラスの授業上書き確認】\n\n` +
+                `${className} ${dayName}${periodNum}限にすでに授業があります:\n\n` +
+                `既存:\n  科目: ${existingSubject?.name || '不明'}\n  担当: ${existingTeacherNames}\n\n` +
+                `新規:\n  科目: ${newSubject?.name || '不明'}\n  担当: ${newTeacherNames}\n\n` +
+                `既存の授業を削除して移動しますか？`;
+            return confirm(message);
+        }
     }
 
     confirmLinkedOverwrite(draggedSlot, linkedLessons, toDay, toPeriod) {
@@ -313,7 +360,73 @@ class DragDropHandler {
 
     handleClassDrop(toClassId, toDay, toPeriod) {
         const slot = this.draggedData.slots[0];
+        const slotsToMove = this.draggedData.isJoint ? this.draggedData.slots : [slot];
+        const dayName = DAYS[toDay];
+        const periodNum = toPeriod + 1;
 
+        // 移動先クラスに既存授業があるか確認
+        const overwriteTargets = slotsToMove
+            .map(s => ({ s, existing: this.store.getSlot(s.classId, toDay, toPeriod) }))
+            .filter(({ existing }) => existing.length > 0);
+
+        if (overwriteTargets.length > 0) {
+            const details = overwriteTargets.map(({ s, existing }) => {
+                const cls = CLASSES.find(c => c.id === s.classId);
+                const existingSubject = this.store.getSubject(existing[0].subjectId);
+                const teacherNames = (existing[0].teacherIds || [])
+                    .map(tid => { const t = this.store.getTeacher(tid); return t ? t.name : '不明'; })
+                    .join('・');
+                return `  ${cls?.name || s.classId}: ${existingSubject?.name || '不明'}（${teacherNames}）`;
+            }).join('\n');
+            if (!confirm(`【上書き確認】\n\n${dayName}${periodNum}限に既存の授業があります:\n\n${details}\n\nこれらを削除して移動しますか？`)) {
+                return;
+            }
+        }
+
+        // 移動先に教員の授業が他クラスにあるか確認（教員重複）
+        const teacherConflicts = [];
+        const ttCandidates = [];
+        slotsToMove.forEach(s => {
+            (s.teacherIds || []).forEach(tid => {
+                const teacherSlots = this.store.getTeacherTimetable(tid);
+                const key = `${toDay}-${toPeriod}`;
+                (teacherSlots[key] || []).forEach(ex => {
+                    // 移動対象クラス自身の授業（上書き済み確認）は除外
+                    if (slotsToMove.some(ms => ms.classId === ex.classId)) return;
+                    if (ex.subjectId === s.subjectId) {
+                        ttCandidates.push({ tid, ex, s });
+                    } else {
+                        teacherConflicts.push({ tid, ex, s });
+                    }
+                });
+            });
+        });
+
+        if (teacherConflicts.length > 0) {
+            const details = [...new Map(teacherConflicts.map(c => [c.tid + c.ex.classId, c])).values()]
+                .map(({ tid, ex }) => {
+                    const t = this.store.getTeacher(tid);
+                    const cls = CLASSES.find(c => c.id === ex.classId);
+                    const subj = this.store.getSubject(ex.subjectId);
+                    return `  ${t?.name || '不明'}: ${cls?.name || '不明'}で${subj?.name || '不明'}を担当中`;
+                }).join('\n');
+            if (!confirm(`【教員の重複確認】\n\n${dayName}${periodNum}限に担当教員がすでに他のクラスで授業を持っています:\n\n${details}\n\nそのまま移動しますか？`)) {
+                return;
+            }
+        } else if (ttCandidates.length > 0) {
+            const details = [...new Map(ttCandidates.map(c => [c.tid + c.ex.classId, c])).values()]
+                .map(({ tid, ex }) => {
+                    const t = this.store.getTeacher(tid);
+                    const cls = CLASSES.find(c => c.id === ex.classId);
+                    const subj = this.store.getSubject(ex.subjectId);
+                    return `  ${t?.name || '不明'}: ${cls?.name || '不明'}で${subj?.name || '不明'}（TT）`;
+                }).join('\n');
+            if (!confirm(`【TT（合同授業）の確認】\n\n${dayName}${periodNum}限に同じ科目の授業があります:\n\n${details}\n\nTTとして配置しますか？`)) {
+                return;
+            }
+        }
+
+        // 移動実行
         if (this.draggedData.isJoint) {
             // 合同授業の一括移動
             this.draggedData.slots.forEach(s => {
