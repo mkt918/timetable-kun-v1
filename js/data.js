@@ -905,10 +905,10 @@ class DataStore {
      * @param {string[]} teacherIds
      * @param {string[]|null} specialClassroomIds
      * @param {{ dryRun?: boolean, forcePartial?: boolean, skipJoint?: boolean }} opts
-     * @returns {{ placed, blocked, consecutive, lessonType, allClassIds }}
+     * @returns {{ placed, blocked, ttConflicts, consecutive, lessonType, allClassIds }}
      */
     placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds = null, opts = {}) {
-        const { dryRun = false, forcePartial = false, skipJoint = false } = opts;
+        const { dryRun = false, forcePartial = false, skipJoint = false, skipTT = false } = opts;
 
         // カリキュラム設定を取得（なければデフォルト）
         const cc = this.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
@@ -918,9 +918,10 @@ class DataStore {
         const jointClassIds = (!skipJoint && lessonType === 'joint' && cc?.jointClassIds?.length > 0)
             ? cc.jointClassIds : [];
 
-        // TT: assignments から全担当教員を追加（重複除去）
+        // TT: skipTT=false のとき assignments から全担当教員を追加（重複除去）
+        // skipTT=true の場合は呼び出し元で解決済みの teacherIds をそのまま使う
         let resolvedTeacherIds = [...teacherIds];
-        if (lessonType === 'tt') {
+        if (lessonType === 'tt' && !skipTT) {
             const ttTeachers = this.assignments
                 .filter(a => a.classId === classId && a.subjectId === subjectId)
                 .map(a => a.teacherId);
@@ -930,24 +931,11 @@ class DataStore {
         // 対象クラス（合同クラス含む）
         const allClassIds = [classId, ...jointClassIds];
 
-        // 全スロット（主スロット含む）の衝突チェック
+        // 後続スロット＆合同クラスの衝突チェック（主スロットは呼び出し元で確認済みのため除く）
         const blocked = [];
-
-        // 主スロットの衝突（呼び出し元では既に確認済みだが、placeWithConstraints は独立して動作可能）
-        const primaryKey = `${day}-${period}`;
-        const existingPrimary = this.timetable[classId]?.[primaryKey];
-        if (existingPrimary && existingPrimary.length > 0) {
-            const subj = this.getSubject(existingPrimary[0].subjectId);
-            blocked.push({
-                classId, day, period,
-                reason: subj ? `${subj.name}が配置済み` : '既に授業があります'
-            });
-        }
-
-        // 後続スロット＆合同クラスの衝突チェック（主スロット除く）
         for (let p = period; p < period + consecutive && p < PERIODS; p++) {
             for (const cid of allClassIds) {
-                if (cid === classId && p === period) continue; // 主スロット（最初の1つだけ）は上で処理済み
+                if (cid === classId && p === period) continue; // 主スロットは呼び出し元で処理済み
                 const key = `${day}-${p}`;
                 const existing = this.timetable[cid]?.[key];
                 if (existing && existing.length > 0) {
@@ -960,9 +948,33 @@ class DataStore {
             }
         }
 
+        // TT教員の空き確認（自動追加された教員が対象スロットに他の授業を持っていないか）
+        const ttConflicts = [];
+        if (lessonType === 'tt') {
+            // teacherIds に含まれない、自動追加されたTT教員のみ確認
+            const addedTtTeachers = resolvedTeacherIds.filter(tid => !teacherIds.includes(tid));
+            for (const ttTid of addedTtTeachers) {
+                const ttTimetable = this.getTeacherTimetable(ttTid);
+                for (let p = period; p < period + consecutive && p < PERIODS; p++) {
+                    const key = `${day}-${p}`;
+                    const busy = ttTimetable[key] || [];
+                    if (busy.length > 0) {
+                        const teacher = this.getTeacher(ttTid);
+                        const busySubj = this.getSubject(busy[0].subjectId);
+                        ttConflicts.push({
+                            teacherId: ttTid,
+                            teacherName: teacher?.name || ttTid,
+                            day, period: p,
+                            reason: busySubj ? `${busySubj.name}を担当中` : '別授業を担当中'
+                        });
+                    }
+                }
+            }
+        }
+
         // dryRun または衝突あり（forcePartialでない）の場合は配置しない
         if (dryRun || (blocked.length > 0 && !forcePartial)) {
-            return { placed: [], blocked, consecutive, lessonType, allClassIds };
+            return { placed: [], blocked, ttConflicts, consecutive, lessonType, allClassIds };
         }
 
         // 配置実行（衝突スロットはスキップ）
@@ -977,7 +989,7 @@ class DataStore {
             }
         }
 
-        return { placed, blocked, consecutive, lessonType, allClassIds };
+        return { placed, blocked, ttConflicts, consecutive, lessonType, allClassIds };
     }
 
     // ══════════════════════════════════════════════════════════

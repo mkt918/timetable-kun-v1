@@ -453,12 +453,28 @@ class LessonManager {
             forcePartial = true;
         }
 
+        // TT設定の場合、自動追加されるTT教員が既に別授業を持っていれば確認を取る
+        let skipTT = false;
+        if (check.ttConflicts && check.ttConflicts.length > 0) {
+            const lines = check.ttConflicts.map(c => {
+                return `  ${c.teacherName} ${DAYS[c.day]}${c.period + 1}限: ${c.reason}`;
+            }).join('\n');
+            const msg = `TT（チームティーチング）設定の教員が以下の時間帯に授業を担当しています:\n\n${lines}\n\n該当教員の時間割には配置しません。主担当のみで配置しますか？`;
+            if (!confirm(msg)) return; // キャンセル → 何も置かない
+            // 競合していない TT 教員のみ teacherIds に追加し、skipTT=true で再解決を防ぐ
+            const conflictTeacherIds = new Set(check.ttConflicts.map(c => c.teacherId));
+            const allTtTeachers = this.store.assignments
+                .filter(a => a.classId === classId && a.subjectId === subjectId)
+                .map(a => a.teacherId);
+            teacherIds = [...new Set([...teacherIds, ...allTtTeachers.filter(tid => !conflictTeacherIds.has(tid))])];
+            skipTT = true;
+        }
+
         // ★ すべてのユーザー確認が終わった後に snapshot を呼ぶ
-        // （confirm ダイアログ中に他の操作が起きて state が変わるのを防ぐ）
         this.store.snapshot();
         this.ui.updateUndoRedoButtons();
 
-        const result = this.store.placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds, { forcePartial });
+        const result = this.store.placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds, { forcePartial, skipTT });
 
         this.close();
         this.ui.renderMainOverview();
@@ -475,17 +491,35 @@ class LessonManager {
     }
 
     /**
+     * TT設定の科目に対して assignments から全担当教員を解決して返す。
+     * TT設定でない場合はそのまま teacherIds を返す。
+     */
+    _resolveTtTeacherIds(classId, subjectId, teacherIds) {
+        const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
+        if (!cc || cc.lessonType !== 'tt') return teacherIds;
+        const ttTeachers = this.store.assignments
+            .filter(a => a.classId === classId && a.subjectId === subjectId)
+            .map(a => a.teacherId);
+        return [...new Set([...teacherIds, ...ttTeachers])];
+    }
+
+    /**
      * 連続コマ設定に従い後続スロットにも授業を展開する（append モード専用）
      * 主スロットは呼び出し元で配置済みであることが前提。
+     * TT設定の科目は assignments から全担当教員を解決して配置する。
      */
     _expandConsecutive(classId, day, period, subjectId, teacherIds, specialClassroomIds) {
         const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
         const consecutive = cc ? (cc.consecutivePeriods || 1) : 1;
         if (consecutive <= 1) return;
+
+        // TT設定なら全担当教員を解決
+        const resolvedTeacherIds = this._resolveTtTeacherIds(classId, subjectId, teacherIds);
+
         for (let p = period + 1; p < period + consecutive && p < PERIODS; p++) {
             const existing = this.store.getSlot(classId, day, p);
             if (existing.length === 0) {
-                this.store.setSlot(classId, day, p, subjectId, teacherIds, specialClassroomIds);
+                this.store.setSlot(classId, day, p, subjectId, resolvedTeacherIds, specialClassroomIds);
             }
         }
     }
@@ -652,10 +686,11 @@ class LessonManager {
                     continue; // キャンセル → この授業はスキップ
                 }
 
-                // 既存の授業を削除してから配置（連続コマ展開も実施）
+                // 既存の授業を削除してから配置（TT教員解決・連続コマ展開も実施）
+                const resolvedForOverwrite = this._resolveTtTeacherIds(classId, subjectId, [teacherId]);
                 this.store.clearSlot(classId, day, period);
-                this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds, true);
-                this._expandConsecutive(classId, day, period, subjectId, [teacherId], specialClassroomIds);
+                this.store.setSlot(classId, day, period, subjectId, resolvedForOverwrite, specialClassroomIds, true);
+                this._expandConsecutive(classId, day, period, subjectId, resolvedForOverwrite, specialClassroomIds);
                 registeredCount++;
                 continue;
             }
@@ -692,9 +727,10 @@ class LessonManager {
                     this.store.setSlot(classId, day, period, subjectId, existingSlot.teacherIds, specialClassroomIds);
                 }
             } else {
-                // 新規配置（連続コマ設定も反映）
-                this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds, true);
-                this._expandConsecutive(classId, day, period, subjectId, [teacherId], specialClassroomIds);
+                // 新規配置（TT教員解決・連続コマ設定も反映）
+                const resolvedIds = this._resolveTtTeacherIds(classId, subjectId, [teacherId]);
+                this.store.setSlot(classId, day, period, subjectId, resolvedIds, specialClassroomIds, true);
+                this._expandConsecutive(classId, day, period, subjectId, resolvedIds, specialClassroomIds);
                 registeredCount++;
             }
         }
