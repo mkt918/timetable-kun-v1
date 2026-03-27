@@ -896,6 +896,7 @@ class DataStore {
      *
      * dryRun=true の場合は配置チェックのみ行い、実際には書き込まない。
      * forcePartial=true の場合は衝突スロットをスキップして残りを配置。
+     * skipJoint=true の場合は合同クラスへの自動展開をスキップ（教員が手動で複数クラス選択する場合に使用）。
      *
      * @param {string} classId
      * @param {number} day
@@ -903,17 +904,18 @@ class DataStore {
      * @param {string} subjectId
      * @param {string[]} teacherIds
      * @param {string[]|null} specialClassroomIds
-     * @param {{ dryRun?: boolean, forcePartial?: boolean }} opts
+     * @param {{ dryRun?: boolean, forcePartial?: boolean, skipJoint?: boolean }} opts
      * @returns {{ placed, blocked, consecutive, lessonType, allClassIds }}
      */
     placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds = null, opts = {}) {
-        const { dryRun = false, forcePartial = false } = opts;
+        const { dryRun = false, forcePartial = false, skipJoint = false } = opts;
 
         // カリキュラム設定を取得（なければデフォルト）
         const cc = this.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
         const consecutive = cc ? (cc.consecutivePeriods || 1) : 1;
         const lessonType  = cc ? (cc.lessonType || 'normal') : 'normal';
-        const jointClassIds = (lessonType === 'joint' && cc?.jointClassIds?.length > 0)
+        // skipJoint=true のとき合同クラスへの自動展開をしない
+        const jointClassIds = (!skipJoint && lessonType === 'joint' && cc?.jointClassIds?.length > 0)
             ? cc.jointClassIds : [];
 
         // TT: assignments から全担当教員を追加（重複除去）

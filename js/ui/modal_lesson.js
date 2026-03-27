@@ -474,6 +474,22 @@ class LessonManager {
         showToast(`授業を配置しました${extraStr}${blockedStr}`, result.blocked.length > 0 ? 'warning' : 'success');
     }
 
+    /**
+     * 連続コマ設定に従い後続スロットにも授業を展開する（append モード専用）
+     * 主スロットは呼び出し元で配置済みであることが前提。
+     */
+    _expandConsecutive(classId, day, period, subjectId, teacherIds, specialClassroomIds) {
+        const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
+        const consecutive = cc ? (cc.consecutivePeriods || 1) : 1;
+        if (consecutive <= 1) return;
+        for (let p = period + 1; p < period + consecutive && p < PERIODS; p++) {
+            const existing = this.store.getSlot(classId, day, p);
+            if (existing.length === 0) {
+                this.store.setSlot(classId, day, p, subjectId, teacherIds, specialClassroomIds);
+            }
+        }
+    }
+
     registerMultipleLessons(teacherId, day, period, selectedCheckboxes) {
         // 特別教室IDs取得
         const selectedRooms = Array.from(document.querySelectorAll('.room-checkbox:checked')).map(cb => cb.value);
@@ -490,7 +506,7 @@ class LessonManager {
             subjectId: cb.dataset.subjectId
         }));
 
-        // ★ 削除前のスロット状態をスナップショット（競合チェックに使用）
+        // 削除前のスロット状態を記録（競合チェックに使用）
         const preDeleteSnapshot = {};
         const affectedClassIds = new Set([
             ...currentSlots.map(s => s.classId),
@@ -500,17 +516,14 @@ class LessonManager {
             preDeleteSnapshot[cid] = [...this.store.getSlot(cid, day, period)];
         });
 
-        // 学年違い合同授業の警告チェック
+        // 学年違い合同授業の警告チェック（操作前に確認を取る）
         if (selectedLessons.length > 1) {
             const grades = new Set();
             selectedLessons.forEach(lesson => {
-                // クラスIDから学年を抽出（例: "1-A" → "1", "2-B" → "2"）
                 const cls = CLASSES.find(c => c.id === lesson.classId);
                 if (cls && cls.name) {
                     const match = cls.name.match(/^(\d)/);
-                    if (match) {
-                        grades.add(match[1]);
-                    }
+                    if (match) grades.add(match[1]);
                 }
             });
 
@@ -522,11 +535,13 @@ class LessonManager {
                     `通常、学年が異なるクラスでの合同授業は行われません。\n` +
                     `このまま合同授業を作成しますか？`;
 
-                if (!confirm(message)) {
-                    return; // キャンセル
-                }
+                if (!confirm(message)) return; // キャンセル
             }
         }
+
+        // ★ 全ての確認ダイアログを終えた後に Undo 用スナップショットを保存
+        this.store.snapshot();
+        this.ui.updateUndoRedoButtons();
 
         // チェックが外された授業を削除
         currentSlots.forEach(slot => {
@@ -637,9 +652,10 @@ class LessonManager {
                     continue; // キャンセル → この授業はスキップ
                 }
 
-                // 既存の授業を削除してから配置
+                // 既存の授業を削除してから配置（連続コマ展開も実施）
                 this.store.clearSlot(classId, day, period);
                 this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds, true);
+                this._expandConsecutive(classId, day, period, subjectId, [teacherId], specialClassroomIds);
                 registeredCount++;
                 continue;
             }
@@ -676,8 +692,9 @@ class LessonManager {
                     this.store.setSlot(classId, day, period, subjectId, existingSlot.teacherIds, specialClassroomIds);
                 }
             } else {
-                // 新規配置
+                // 新規配置（連続コマ設定も反映）
                 this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds, true);
+                this._expandConsecutive(classId, day, period, subjectId, [teacherId], specialClassroomIds);
                 registeredCount++;
             }
         }

@@ -449,16 +449,23 @@ class ClassCurriculumManager {
                     return '';
                 })();
 
-                const disabled = !checked && atLimit;
+                // 科目未設定クラスは選択不可（already-checked なら解除のため許可）
+                const disabledByLimit = !checked && atLimit;
+                const disabledByNoCurriculum = !checked && !peerHasCurriculum;
+                const disabled = disabledByLimit || disabledByNoCurriculum;
+
+                const bgColor = checked ? '#ecfdf5' : disabled ? '#f9fafb' : '#fff';
+                const borderColor = checked ? '#6ee7b7' : disabledByNoCurriculum ? '#fca5a5' : '#e5e7eb';
+                const cursor = disabled ? 'not-allowed' : 'pointer';
                 return `
                     <label class="cc-joint-row" data-class-id="${escapeHtml(c.id)}"
                         style="display:flex; align-items:center; gap:10px; padding:8px 12px; margin:2px 0;
-                               border-radius:7px; cursor:${disabled ? 'not-allowed' : 'pointer'};
-                               border:1px solid ${checked ? '#6ee7b7' : '#e5e7eb'};
-                               background:${checked ? '#ecfdf5' : disabled ? '#f9fafb' : '#fff'};
+                               border-radius:7px; cursor:${cursor};
+                               border:1px solid ${borderColor};
+                               background:${bgColor};
                                opacity:${disabled ? '0.5' : '1'};">
                         <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}
-                            style="accent-color:#059669; width:16px; height:16px; cursor:${disabled ? 'not-allowed' : 'pointer'};">
+                            style="accent-color:#059669; width:16px; height:16px; cursor:${cursor};">
                         <span style="font-size:0.9em; font-weight:${checked ? '600' : '400'}; color:${checked ? '#065f46' : '#374151'};">${escapeHtml(c.name)}</span>
                         ${statusBadge}
                     </label>
