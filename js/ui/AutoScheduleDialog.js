@@ -102,8 +102,8 @@ class AutoScheduleDialog {
 
             </div>
             <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding:12px 20px; border-top:1px solid #e5e7eb;">
-                <button id="as-cancel" class="btn-secondary">キャンセル</button>
-                <button id="as-preview" class="btn-primary">プレビューを見る →</button>
+                <button id="as-cancel" class="btn btn-secondary">キャンセル</button>
+                <button id="as-preview" class="btn btn-primary">プレビューを見る →</button>
             </div>
         </div>`;
     }
@@ -216,8 +216,8 @@ class AutoScheduleDialog {
 
             </div>
             <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding:12px 20px; border-top:1px solid #e5e7eb;">
-                <button id="as-back" class="btn-secondary">← 戻る</button>
-                <button id="as-execute" class="btn-primary" ${placedCount === 0 ? 'disabled' : ''}>この内容で実行する</button>
+                <button id="as-back" class="btn btn-secondary">← 戻る</button>
+                <button id="as-execute" class="btn btn-primary" ${placedCount === 0 ? 'disabled' : ''}>この内容で実行する</button>
             </div>
         </div>`;
 

@@ -47,6 +47,7 @@ class UnavailableSettingsManager {
         }
 
         document.getElementById('btn-save-unavailable').onclick = () => this.save();
+        document.getElementById('btn-cancel-unavailable').onclick = () => modal.classList.add('hidden');
 
         const closeBtns = modal.querySelectorAll('.modal-close');
         closeBtns.forEach(btn => btn.onclick = () => modal.classList.add('hidden'));
