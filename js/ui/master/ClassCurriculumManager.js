@@ -426,56 +426,98 @@ class ClassCurriculumManager {
         // 同じ学年の他クラスが候補
         const candidates = CLASSES.filter(c => c.grade === cls?.grade && c.id !== cc.classId);
         const currentIds = new Set(cc.jointClassIds || []);
+        const MAX_JOINT = 5; // 自クラス含め最大6クラス → 他クラスは最大5
 
         const overlay = document.createElement('div');
         overlay.className = 'dialog-overlay';
 
         const render = () => {
+            const selectedCount = currentIds.size;
+            const atLimit = selectedCount >= MAX_JOINT;
+
             const items = candidates.map(c => {
                 const checked = currentIds.has(c.id);
+                // 相手クラスの同科目カリキュラム設定を確認
+                const peerCc = this.store.classCurriculum.find(x => x.classId === c.id && x.subjectId === cc.subjectId);
+                const peerHasCurriculum = !!peerCc;
+                const peerIsLinked = peerCc && (peerCc.jointClassIds || []).includes(cc.classId);
+
+                const statusBadge = (() => {
+                    if (!peerHasCurriculum) return '<span style="margin-left:auto; font-size:0.72em; color:#ef4444; background:#fef2f2; padding:1px 6px; border-radius:4px;">科目未設定</span>';
+                    if (checked) return '<span style="margin-left:auto; font-size:0.72em; color:#059669; font-weight:600; background:#ecfdf5; padding:1px 6px; border-radius:4px;">合同リンク済</span>';
+                    if (peerIsLinked) return '<span style="margin-left:auto; font-size:0.72em; color:#d97706; background:#fffbeb; padding:1px 6px; border-radius:4px;">片側リンク中</span>';
+                    return '';
+                })();
+
+                const disabled = !checked && atLimit;
                 return `
                     <label class="cc-joint-row" data-class-id="${escapeHtml(c.id)}"
                         style="display:flex; align-items:center; gap:10px; padding:8px 12px; margin:2px 0;
-                               border-radius:7px; cursor:pointer; border:1px solid ${checked ? '#6ee7b7' : '#e5e7eb'};
-                               background:${checked ? '#ecfdf5' : '#fff'};">
-                        <input type="checkbox" ${checked ? 'checked' : ''} style="accent-color:#059669; width:16px; height:16px; cursor:pointer;">
+                               border-radius:7px; cursor:${disabled ? 'not-allowed' : 'pointer'};
+                               border:1px solid ${checked ? '#6ee7b7' : '#e5e7eb'};
+                               background:${checked ? '#ecfdf5' : disabled ? '#f9fafb' : '#fff'};
+                               opacity:${disabled ? '0.5' : '1'};">
+                        <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}
+                            style="accent-color:#059669; width:16px; height:16px; cursor:${disabled ? 'not-allowed' : 'pointer'};">
                         <span style="font-size:0.9em; font-weight:${checked ? '600' : '400'}; color:${checked ? '#065f46' : '#374151'};">${escapeHtml(c.name)}</span>
-                        ${checked ? '<span style="margin-left:auto; font-size:0.75em; color:#059669; font-weight:600;">合同</span>' : ''}
+                        ${statusBadge}
                     </label>
                 `;
             }).join('') || '<p style="color:#aaa; text-align:center; padding:16px;">同学年の他クラスがありません</p>';
 
+            const limitMsg = atLimit
+                ? `<p style="margin:8px 0 0; font-size:0.78em; color:#ef4444; text-align:right;">最大${MAX_JOINT}クラス（自クラス含め6クラス）まで選択可能です</p>`
+                : '';
+
             overlay.innerHTML = `
-                <div class="dialog-content" style="width:340px; max-width:90vw;">
+                <div class="dialog-content" style="width:360px; max-width:90vw;">
                     <h3 style="margin:0 0 4px; font-size:1em; font-weight:700;">合同クラスを選択</h3>
-                    <p style="margin:0 0 14px; font-size:0.82em; color:#6b7280;">
-                        ${escapeHtml(className)} の「${escapeHtml(subName)}」に合同参加するクラスを選んでください
+                    <p style="margin:0 0 4px; font-size:0.82em; color:#6b7280;">
+                        <strong>${escapeHtml(className)}</strong> の「${escapeHtml(subName)}」に合同参加するクラスを選んでください
                     </p>
-                    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:6px; max-height:300px; overflow-y:auto;">
+                    <p style="margin:0 0 12px; font-size:0.78em; color:#9ca3af;">
+                        選択すると相手クラスの同科目カリキュラムにも自動でリンクされます
+                    </p>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:0.78em; color:#6b7280;">選択中: <strong>${selectedCount}</strong> クラス（自クラス含め <strong>${selectedCount + 1}</strong> / 6）</span>
+                    </div>
+                    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:6px; max-height:280px; overflow-y:auto;">
                         ${items}
                     </div>
+                    ${limitMsg}
                     <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
                         <button id="cc-joint-cancel" class="btn btn-secondary">キャンセル</button>
-                        <button id="cc-joint-ok" class="btn btn-primary">保存</button>
+                        <button id="cc-joint-ok" class="btn btn-primary">保存してリンク</button>
                     </div>
                 </div>
             `;
 
             overlay.querySelectorAll('.cc-joint-row').forEach(row => {
                 row.onclick = (e) => {
-                    if (e.target.tagName === 'INPUT') return; // チェックボックス直接クリックは通常動作
+                    if (e.target.tagName === 'INPUT') return;
                     const cb = row.querySelector('input[type=checkbox]');
-                    cb.checked = !cb.checked;
+                    if (cb.disabled) return;
                     const cid = row.dataset.classId;
-                    if (cb.checked) currentIds.add(cid);
-                    else currentIds.delete(cid);
+                    if (cb.checked) {
+                        cb.checked = false;
+                        currentIds.delete(cid);
+                    } else {
+                        if (currentIds.size >= MAX_JOINT) return;
+                        cb.checked = true;
+                        currentIds.add(cid);
+                    }
                     render();
                 };
                 const cb = row.querySelector('input[type=checkbox]');
                 cb.onchange = () => {
                     const cid = row.dataset.classId;
-                    if (cb.checked) currentIds.add(cid);
-                    else currentIds.delete(cid);
+                    if (cb.checked) {
+                        if (currentIds.size >= MAX_JOINT) { cb.checked = false; return; }
+                        currentIds.add(cid);
+                    } else {
+                        currentIds.delete(cid);
+                    }
+                    render();
                 };
             });
 
@@ -486,7 +528,10 @@ class ClassCurriculumManager {
                 });
                 overlay.remove();
                 this.renderCurriculumTable();
-                showToast('合同クラスを保存しました', 'success');
+                const count = currentIds.size;
+                showToast(count > 0
+                    ? `合同グループを設定しました（${count + 1}クラス・双方向リンク済）`
+                    : '合同設定を解除しました', 'success');
             };
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
         };

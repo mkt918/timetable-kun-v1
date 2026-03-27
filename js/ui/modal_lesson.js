@@ -437,12 +437,41 @@ class LessonManager {
         const selectedRooms = Array.from(document.querySelectorAll('.room-checkbox:checked')).map(cb => cb.value);
         const specialClassroomIds = selectedRooms.length > 0 ? selectedRooms : null;
 
-        this.store.setSlot(classId, day, period, subjectId, teacherIds, specialClassroomIds);
+        // まず dryRun で衝突チェック（連続コマ・合同クラスが全部空きか確認）
+        const check = this.store.placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds, { dryRun: true });
+
+        let forcePartial = false;
+        if (check.blocked.length > 0) {
+            // 衝突しているコマをダイアログで確認
+            const lines = check.blocked.map(b => {
+                const cls = CLASSES.find(c => c.id === b.classId);
+                const clsName = cls ? cls.name : b.classId;
+                return `  ${clsName} ${DAYS[b.day]}${b.period + 1}限: ${b.reason}`;
+            }).join('\n');
+            const msg = `以下のコマに既存の授業があるため、すべての配置ができません:\n\n${lines}\n\n空いているコマのみ配置しますか？（既存の授業は変更されません）`;
+            if (!confirm(msg)) return; // キャンセル → 何も置かない
+            forcePartial = true;
+        }
+
+        // ★ すべてのユーザー確認が終わった後に snapshot を呼ぶ
+        // （confirm ダイアログ中に他の操作が起きて state が変わるのを防ぐ）
+        this.store.snapshot();
+        this.ui.updateUndoRedoButtons();
+
+        const result = this.store.placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds, { forcePartial });
 
         this.close();
         this.ui.renderMainOverview();
         this.ui.checkConflicts();
-        showToast('授業を配置しました', 'success');
+
+        // トーストメッセージをカリキュラム設定に合わせて組み立て
+        const extras = [];
+        if (result.consecutive > 1) extras.push(`${result.consecutive}コマ連続`);
+        if (result.lessonType === 'tt' && result.allClassIds.length === 1) extras.push('TT');
+        if (result.allClassIds.length > 1) extras.push(`${result.allClassIds.length}クラス合同`);
+        const extraStr = extras.length > 0 ? `（${extras.join('・')}）` : '';
+        const blockedStr = result.blocked.length > 0 ? `、${result.blocked.length}コマはスキップ` : '';
+        showToast(`授業を配置しました${extraStr}${blockedStr}`, result.blocked.length > 0 ? 'warning' : 'success');
     }
 
     registerMultipleLessons(teacherId, day, period, selectedCheckboxes) {

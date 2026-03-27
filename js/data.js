@@ -830,10 +830,152 @@ class DataStore {
             item.lessonType = options.lessonType;
         }
         if (options.jointClassIds !== undefined) {
-            item.jointClassIds = options.jointClassIds;
+            // 双方向リンクを同期（jointClassIds の変更は必ず _syncJointGroup 経由で行う）
+            this._syncJointGroup(item.classId, item.subjectId, options.jointClassIds);
         }
         this.saveToStorage();
         return { success: true };
+    }
+
+    /**
+     * 合同グループの双方向リンクを同期する
+     *
+     * 仕様:
+     * - 新グループの全メンバー: 互いに jointClassIds で「他メンバー全員」を持つ
+     * - 旧グループから外れたメンバー: 当該クラスを jointClassIds から削除
+     * - 複数グループ切り替え: 旧グループメンバーが新グループに参加しない場合、完全に解除
+     * - 最大6クラス（自クラス含む）の制約を適用
+     *
+     * 例: 2-3（体育）を [2-4, 2-5] → [2-5, 2-6] に変更
+     *   1. 新グループ [2-3, 2-5, 2-6] の全メンバーを双方向リンク
+     *   2. 旧グループにいた 2-4 から 2-3 を削除（2-4は now singleton）
+     *
+     * @param {string} classId  - 起点クラスID
+     * @param {string} subjectId
+     * @param {string[]} newJointIds - 新しく合同にするクラスID一覧（自クラスは含まない）
+     */
+    _syncJointGroup(classId, subjectId, newJointIds) {
+        // 最大6クラス制約（自クラス含む）=> 他クラスは最大5
+        const limitedJointIds = newJointIds.slice(0, 5);
+
+        // 旧グループを取得（解除対象判定のため）
+        const sourceEntry = this.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
+        const oldJointIds = sourceEntry ? (sourceEntry.jointClassIds || []) : [];
+
+        // 新グループ全メンバー（自クラス含む）
+        const allNewMembers = [classId, ...limitedJointIds];
+        const newMemberSet = new Set(allNewMembers);
+
+        // ステップ1: 新グループの全メンバーを相互リンク
+        for (const memberId of allNewMembers) {
+            const entry = this.classCurriculum.find(c => c.classId === memberId && c.subjectId === subjectId);
+            if (!entry) continue; // 相手クラスにその科目の履歴がない場合はスキップ
+            entry.jointClassIds = allNewMembers.filter(id => id !== memberId);
+            entry.lessonType = entry.jointClassIds.length > 0 ? 'joint' : 'normal';
+        }
+
+        // ステップ2: 旧グループから外れたクラスのリンクを削除
+        // （新グループに参加していないメンバーから、当該クラスを削除）
+        for (const oldId of oldJointIds) {
+            if (!newMemberSet.has(oldId)) { // 新グループにいない
+                const entry = this.classCurriculum.find(c => c.classId === oldId && c.subjectId === subjectId);
+                if (!entry) continue;
+                entry.jointClassIds = (entry.jointClassIds || []).filter(id => id !== classId);
+                if (entry.jointClassIds.length === 0) {
+                    entry.lessonType = 'normal';
+                }
+            }
+        }
+    }
+
+    /**
+     * カリキュラム設定（TT・合同・連続コマ）を考慮して授業を配置する
+     * - lessonType='tt'  : assignments から全TT担当教員を自動追加
+     * - lessonType='joint': jointClassIds の全クラスにも同時配置
+     * - consecutivePeriods>1: 後続コマにも連続配置
+     *
+     * dryRun=true の場合は配置チェックのみ行い、実際には書き込まない。
+     * forcePartial=true の場合は衝突スロットをスキップして残りを配置。
+     *
+     * @param {string} classId
+     * @param {number} day
+     * @param {number} period
+     * @param {string} subjectId
+     * @param {string[]} teacherIds
+     * @param {string[]|null} specialClassroomIds
+     * @param {{ dryRun?: boolean, forcePartial?: boolean }} opts
+     * @returns {{ placed, blocked, consecutive, lessonType, allClassIds }}
+     */
+    placeWithConstraints(classId, day, period, subjectId, teacherIds, specialClassroomIds = null, opts = {}) {
+        const { dryRun = false, forcePartial = false } = opts;
+
+        // カリキュラム設定を取得（なければデフォルト）
+        const cc = this.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
+        const consecutive = cc ? (cc.consecutivePeriods || 1) : 1;
+        const lessonType  = cc ? (cc.lessonType || 'normal') : 'normal';
+        const jointClassIds = (lessonType === 'joint' && cc?.jointClassIds?.length > 0)
+            ? cc.jointClassIds : [];
+
+        // TT: assignments から全担当教員を追加（重複除去）
+        let resolvedTeacherIds = [...teacherIds];
+        if (lessonType === 'tt') {
+            const ttTeachers = this.assignments
+                .filter(a => a.classId === classId && a.subjectId === subjectId)
+                .map(a => a.teacherId);
+            resolvedTeacherIds = [...new Set([...resolvedTeacherIds, ...ttTeachers])];
+        }
+
+        // 対象クラス（合同クラス含む）
+        const allClassIds = [classId, ...jointClassIds];
+
+        // 全スロット（主スロット含む）の衝突チェック
+        const blocked = [];
+
+        // 主スロットの衝突（呼び出し元では既に確認済みだが、placeWithConstraints は独立して動作可能）
+        const primaryKey = `${day}-${period}`;
+        const existingPrimary = this.timetable[classId]?.[primaryKey];
+        if (existingPrimary && existingPrimary.length > 0) {
+            const subj = this.getSubject(existingPrimary[0].subjectId);
+            blocked.push({
+                classId, day, period,
+                reason: subj ? `${subj.name}が配置済み` : '既に授業があります'
+            });
+        }
+
+        // 後続スロット＆合同クラスの衝突チェック（主スロット除く）
+        for (let p = period; p < period + consecutive && p < PERIODS; p++) {
+            for (const cid of allClassIds) {
+                if (cid === classId && p === period) continue; // 主スロット（最初の1つだけ）は上で処理済み
+                const key = `${day}-${p}`;
+                const existing = this.timetable[cid]?.[key];
+                if (existing && existing.length > 0) {
+                    const subj = this.getSubject(existing[0].subjectId);
+                    blocked.push({
+                        classId: cid, day, period: p,
+                        reason: subj ? `${subj.name}が配置済み` : '既に授業があります'
+                    });
+                }
+            }
+        }
+
+        // dryRun または衝突あり（forcePartialでない）の場合は配置しない
+        if (dryRun || (blocked.length > 0 && !forcePartial)) {
+            return { placed: [], blocked, consecutive, lessonType, allClassIds };
+        }
+
+        // 配置実行（衝突スロットはスキップ）
+        const placed = [];
+        const blockedKeys = new Set(blocked.map(b => `${b.classId}-${b.day}-${b.period}`));
+
+        for (let p = period; p < period + consecutive && p < PERIODS; p++) {
+            for (const cid of allClassIds) {
+                if (blockedKeys.has(`${cid}-${day}-${p}`)) continue;
+                this.setSlot(cid, day, p, subjectId, resolvedTeacherIds, specialClassroomIds);
+                placed.push({ classId: cid, day, period: p });
+            }
+        }
+
+        return { placed, blocked, consecutive, lessonType, allClassIds };
     }
 
     // ══════════════════════════════════════════════════════════
