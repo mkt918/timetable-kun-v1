@@ -27,6 +27,7 @@ class DataStore {
     // ══════════════════════════════════════════════════════════
 
     constructor() {
+        this._idSeq = 0;         // ID生成用シーケンス番号（同一ミリ秒内の重複防止）
         this.teachers = [];      // 教員リスト
         this.categories = [];    // 教科カテゴリリスト（国語、数学など）
         this.subjects = [];      // 科目リスト（現代文、古典など）
@@ -775,7 +776,7 @@ class DataStore {
         );
         if (existing) return { success: false, message: '既に登録済みです' };
         this.classCurriculum.push({
-            id: `cc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            id: `cc_${Date.now()}_${++this._idSeq}`,
             classId,
             subjectId,
             weeklyHours: parseInt(weeklyHours) || 1
@@ -882,7 +883,7 @@ class DataStore {
             if (!entry) {
                 // カリキュラムが未登録の相手クラスには最小限のエントリを自動生成
                 entry = {
-                    id: `cc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${memberId}`,
+                    id: `cc_${Date.now()}_${++this._idSeq}_${memberId}`,
                     classId: memberId,
                     subjectId,
                     weeklyHours: 1

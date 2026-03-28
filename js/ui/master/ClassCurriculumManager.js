@@ -357,7 +357,8 @@ class ClassCurriculumManager {
         panel.querySelectorAll('.cc-btn-assign').forEach(btn => {
             btn.onclick = () => {
                 const cc = this.store.classCurriculum.find(c => c.id === btn.dataset.id);
-                if (cc) this.openTeacherAssignDialog(cc.classId, cc.subjectId, cc.weeklyHours);
+                if (!cc) { showToast('カリキュラムデータが見つかりません', 'error'); return; }
+                this.openTeacherAssignDialog(cc.classId, cc.subjectId, cc.weeklyHours);
             };
         });
 
@@ -427,8 +428,13 @@ class ClassCurriculumManager {
         const className = cls ? cls.name : cc.classId;
         const subName = sub ? sub.name : '不明';
 
+        if (!cls) {
+            showToast(`クラス情報が見つかりません（ID: ${cc.classId}）`, 'error');
+            return;
+        }
+
         // 同じ学年の他クラスが候補
-        const candidates = CLASSES.filter(c => c.grade === cls?.grade && c.id !== cc.classId);
+        const candidates = CLASSES.filter(c => c.grade === cls.grade && c.id !== cc.classId);
         const currentIds = new Set(cc.jointClassIds || []);
         const MAX_JOINT = 5; // 自クラス含め最大6クラス → 他クラスは最大5
 
@@ -444,12 +450,17 @@ class ClassCurriculumManager {
                 // 相手クラスの同科目カリキュラム設定を確認
                 const peerCc = this.store.classCurriculum.find(x => x.classId === c.id && x.subjectId === cc.subjectId);
                 const peerHasCurriculum = !!peerCc;
-                const peerIsLinked = peerCc && (peerCc.jointClassIds || []).includes(cc.classId);
+                // 双方向リンク確認: 相手も自クラスを jointClassIds に含んでいるか
+                const peerLinksBack = peerCc && (peerCc.jointClassIds || []).includes(cc.classId);
+                // 双方向リンク済み = 自→相手 かつ 相手→自 の両方が成立
+                const fullyLinked = checked && peerLinksBack;
+                // 片側リンク = 自→相手 または 相手→自 の一方のみ
+                const oneWayLinked = (checked && !peerLinksBack) || (!checked && peerLinksBack);
 
                 const statusBadge = (() => {
                     if (!peerHasCurriculum) return '<span style="margin-left:auto; font-size:0.72em; color:#ef4444; background:#fef2f2; padding:1px 6px; border-radius:4px;">科目未設定</span>';
-                    if (checked) return '<span style="margin-left:auto; font-size:0.72em; color:#059669; font-weight:600; background:#ecfdf5; padding:1px 6px; border-radius:4px;">合同リンク済</span>';
-                    if (peerIsLinked) return '<span style="margin-left:auto; font-size:0.72em; color:#d97706; background:#fffbeb; padding:1px 6px; border-radius:4px;">片側リンク中</span>';
+                    if (fullyLinked) return '<span style="margin-left:auto; font-size:0.72em; color:#059669; font-weight:600; background:#ecfdf5; padding:1px 6px; border-radius:4px;">合同リンク済</span>';
+                    if (oneWayLinked) return '<span style="margin-left:auto; font-size:0.72em; color:#d97706; background:#fffbeb; padding:1px 6px; border-radius:4px;">片側リンク中</span>';
                     return '';
                 })();
 

@@ -225,10 +225,11 @@ class AutoScheduler {
      * タスクを難易度順（候補スロット数が少ない順）にソート
      */
     _sortByDifficulty(tasks, occupiedMap) {
-        tasks.sort((a, b) =>
-            this._findAvailableSlots(a, occupiedMap).length -
-            this._findAvailableSlots(b, occupiedMap).length
+        // 候補スロット数を事前計算してキャッシュ（sort の比較関数内で繰り返し呼ぶと O(n²) になるため）
+        const scoreMap = new Map(
+            tasks.map(t => [t, this._findAvailableSlots(t, occupiedMap).length])
         );
+        tasks.sort((a, b) => scoreMap.get(a) - scoreMap.get(b));
     }
 
     /**
@@ -238,7 +239,7 @@ class AutoScheduler {
     _findAvailableSlots(task, occupiedMap) {
         const candidates = [];
         for (let day = 0; day < DAYS.length; day++) {
-            for (let period = 0; period <= PERIODS - task.consecutive; period++) {
+            for (let period = 0; period <= Math.max(0, PERIODS - task.consecutive); period++) {
                 if (this._isBlockAvailable(task, day, period, occupiedMap)) {
                     candidates.push({ day, period });
                 }
