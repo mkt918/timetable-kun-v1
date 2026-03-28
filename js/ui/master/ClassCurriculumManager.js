@@ -403,6 +403,10 @@ class ClassCurriculumManager {
                     const updated = this.store.classCurriculum.find(c => c.id === sel.dataset.id);
                     if (updated) this.openJointClassDialog(updated);
                 }
+                // 既に配置済みの授業には反映されない旨を案内
+                if (newType !== 'normal') {
+                    showToast('設定を変更しました。既に配置済みの授業への反映は手動で再配置が必要です。', 'info');
+                }
             };
         });
 

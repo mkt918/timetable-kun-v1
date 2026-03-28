@@ -214,6 +214,10 @@ class AutoScheduleDialog {
                     </ul>
                 </details>` : ''}
 
+                <div style="font-size:0.78rem; color:#9ca3af; margin-top:4px;">
+                    ※ このプレビューは現在の時間割状態に基づいています。プレビュー後に手動で授業を追加・変更した場合、実行結果が異なることがあります。
+                </div>
+
             </div>
             <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:8px; padding:12px 20px; border-top:1px solid #e5e7eb;">
                 <button id="as-back" class="btn btn-secondary">← 戻る</button>

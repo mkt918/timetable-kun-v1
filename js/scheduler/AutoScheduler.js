@@ -83,10 +83,11 @@ class AutoScheduler {
 
             for (const { day, period } of chosen) {
                 // 連続ブロック分を一括配置
+                // ※ 自動配置では特別教室情報を持たないため null を渡す（手動で後から設定可能）
                 for (let p = period; p < period + task.consecutive && p < PERIODS; p++) {
                     if (!dryRun) {
                         for (const cid of task.allClassIds) {
-                            this.store.setSlot(cid, day, p, task.subjectId, task.teacherIds);
+                            this.store.setSlot(cid, day, p, task.subjectId, task.teacherIds, null);
                         }
                     }
                     result.placed.push({
@@ -298,8 +299,9 @@ class AutoScheduler {
             if (!slotsForDay || slotsForDay.length === 0) continue;
 
             // まだ使っていない曜日がある間は1曜日1ブロックを優先
+            // 未使用曜日が残っている場合は、同じ曜日に重複して配置しない
             const alreadyOnThisDay = chosen.filter(s => s.day === day).length;
-            if (alreadyOnThisDay >= 1 && chosen.length < count - 1) {
+            if (alreadyOnThisDay >= 1) {
                 const unusedDays = dayOrder.filter(d => !chosen.some(s => s.day === d));
                 if (unusedDays.length > 0) continue;
             }

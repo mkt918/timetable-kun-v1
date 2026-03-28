@@ -78,7 +78,8 @@ class DataStore {
         const state = {
             assignments: JSON.parse(JSON.stringify(this.assignments)),
             timetable: JSON.parse(JSON.stringify(this.timetable)),
-            linkedGroups: JSON.parse(JSON.stringify(this.linkedGroups)) // 連動グループも保存
+            linkedGroups: JSON.parse(JSON.stringify(this.linkedGroups)),
+            classCurriculum: JSON.parse(JSON.stringify(this.classCurriculum)) // カリキュラム設定も保存
         };
         this.undoStack.push(state);
         // 最大履歴数制限
@@ -99,7 +100,8 @@ class DataStore {
         const currentState = {
             assignments: JSON.parse(JSON.stringify(this.assignments)),
             timetable: JSON.parse(JSON.stringify(this.timetable)),
-            linkedGroups: JSON.parse(JSON.stringify(this.linkedGroups))
+            linkedGroups: JSON.parse(JSON.stringify(this.linkedGroups)),
+            classCurriculum: JSON.parse(JSON.stringify(this.classCurriculum))
         };
         this.redoStack.push(currentState);
         if (this.redoStack.length > this.MAX_HISTORY) {
@@ -111,6 +113,9 @@ class DataStore {
         this.assignments = prevState.assignments;
         this.timetable = prevState.timetable;
         this.linkedGroups = prevState.linkedGroups || []; // 旧データ対応
+        if (prevState.classCurriculum !== undefined) {
+            this.classCurriculum = prevState.classCurriculum;
+        }
 
         this.saveToStorage();
         return { success: true };
@@ -126,7 +131,8 @@ class DataStore {
         const currentState = {
             assignments: JSON.parse(JSON.stringify(this.assignments)),
             timetable: JSON.parse(JSON.stringify(this.timetable)),
-            linkedGroups: JSON.parse(JSON.stringify(this.linkedGroups))
+            linkedGroups: JSON.parse(JSON.stringify(this.linkedGroups)),
+            classCurriculum: JSON.parse(JSON.stringify(this.classCurriculum))
         };
         this.undoStack.push(currentState);
         if (this.undoStack.length > this.MAX_HISTORY) {
@@ -138,6 +144,9 @@ class DataStore {
         this.assignments = nextState.assignments;
         this.timetable = nextState.timetable;
         this.linkedGroups = nextState.linkedGroups || [];
+        if (nextState.classCurriculum !== undefined) {
+            this.classCurriculum = nextState.classCurriculum;
+        }
 
         this.saveToStorage();
         return { success: true };
@@ -867,9 +876,19 @@ class DataStore {
         const newMemberSet = new Set(allNewMembers);
 
         // ステップ1: 新グループの全メンバーを相互リンク
+        // 相手クラスにカリキュラムがない場合は自動生成して双方向リンクを完成させる
         for (const memberId of allNewMembers) {
-            const entry = this.classCurriculum.find(c => c.classId === memberId && c.subjectId === subjectId);
-            if (!entry) continue; // 相手クラスにその科目の履歴がない場合はスキップ
+            let entry = this.classCurriculum.find(c => c.classId === memberId && c.subjectId === subjectId);
+            if (!entry) {
+                // カリキュラムが未登録の相手クラスには最小限のエントリを自動生成
+                entry = {
+                    id: `cc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${memberId}`,
+                    classId: memberId,
+                    subjectId,
+                    weeklyHours: 1
+                };
+                this.classCurriculum.push(entry);
+            }
             entry.jointClassIds = allNewMembers.filter(id => id !== memberId);
             entry.lessonType = entry.jointClassIds.length > 0 ? 'joint' : 'normal';
         }
@@ -1435,7 +1454,8 @@ class DataStore {
                 day: day,
                 period: period,
                 subjectId: s.subjectId,
-                teacherIds: s.teacherIds
+                teacherIds: s.teacherIds,
+                specialClassroomIds: s.specialClassroomIds || (s.specialClassroomId ? [s.specialClassroomId] : null)
             });
         });
 
@@ -1461,7 +1481,8 @@ class DataStore {
                                 day: s.day,
                                 period: s.period,
                                 subjectId: slotData[0].subjectId,
-                                teacherIds: slotData[0].teacherIds
+                                teacherIds: slotData[0].teacherIds,
+                                specialClassroomIds: slotData[0].specialClassroomIds || (slotData[0].specialClassroomId ? [slotData[0].specialClassroomId] : null)
                             });
                         }
                     }
@@ -1505,11 +1526,7 @@ class DataStore {
                 const fromKey = `${fromDay}-${fromPeriod}`;
                 this.timetable[lesson.classId][fromKey] = newSlots;
 
-                // 移動先に追加
-                // specialClassroomId も引き継ぐ必要があるが、lessonオブジェクトは getSlot したものではなく getLinkedLessons の結果。
-                // getLinkedLessons は specialClassroomId を返していないので修正が必要。
-                // いや、 data.js の getLinkedLessons 修正は後で行うとして、ここでは slot オブジェクトから直接取る。
-                // slot は getSlot() で取得したもの。
+                // 移動先に追加（特別教室情報を引き継ぐ）
                 const originalSlot = slots.find(s => s.subjectId === lesson.subjectId);
                 const roomIds = originalSlot ? (originalSlot.specialClassroomIds || (originalSlot.specialClassroomId ? [originalSlot.specialClassroomId] : null)) : null;
 
@@ -1549,11 +1566,22 @@ class DataStore {
         const sourceSlot = sourceSlots.find(s => s.subjectId === subjectId); // subjectIdは必須
         const roomIds = sourceSlot ? (sourceSlot.specialClassroomIds || (sourceSlot.specialClassroomId ? [sourceSlot.specialClassroomId] : null)) : null;
 
-        this.setSlot(classId, toDay, toPeriod, subjectId, teacherIds, roomIds, false);
+        this.setSlot(classId, toDay, toPeriod, subjectId, teacherIds, roomIds, true);
 
-        // 2. 移動元から削除
+        // 2. 移動元から削除（同一科目・同一教員構成のスロットのみ削除して他は保持）
         const fromSlots = this.getSlot(classId, fromDay, fromPeriod);
-        const newFromSlots = fromSlots.filter(s => s.subjectId !== subjectId); // 同一科目が複数あると全部消えるが、通常はない想定
+        const teacherSet = new Set(teacherIds);
+        let removedOne = false;
+        const newFromSlots = fromSlots.filter(s => {
+            // 科目が一致 かつ 教員構成が一致 かつ まだ削除していない → 1件だけ削除
+            if (!removedOne && s.subjectId === subjectId &&
+                s.teacherIds.length === teacherIds.length &&
+                s.teacherIds.every(tid => teacherSet.has(tid))) {
+                removedOne = true;
+                return false;
+            }
+            return true;
+        });
 
         const key = `${fromDay}-${fromPeriod}`;
         this.timetable[classId][key] = newFromSlots;
@@ -1851,8 +1879,14 @@ class DataStore {
 
         // 一括移動実行
         group.forEach(item => {
-            // 移動先へ追加
-            this.setSlot(item.classId, toDay, toPeriod, item.subjectId, item.teacherIds, true);
+            // 元スロットから特別教室情報を取得
+            const sourceSlots = this.getSlot(item.classId, day, period);
+            const sourceSlot = sourceSlots.find(s => s.subjectId === item.subjectId);
+            const roomIds = sourceSlot
+                ? (sourceSlot.specialClassroomIds || (sourceSlot.specialClassroomId ? [sourceSlot.specialClassroomId] : null))
+                : null;
+            // 移動先へ追加（append=true で既存授業を保持）
+            this.setSlot(item.classId, toDay, toPeriod, item.subjectId, item.teacherIds, roomIds, true);
 
             // 移動元から削除
             const key = `${day}-${period}`;
