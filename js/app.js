@@ -95,27 +95,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-export-all').addEventListener('click', () => {
         timetableIO.downloadAll();
         showToast('全データをエクスポートしました', 'success');
-        dataDropdown.classList.remove('show');
+        dataDropdownMenu.style.display = 'none';
     });
 
     // マスターのみエクスポート
     document.getElementById('btn-export-master').addEventListener('click', () => {
         timetableIO.downloadMasterData();
         showToast('マスターデータをエクスポートしました', 'success');
-        dataDropdown.classList.remove('show');
+        dataDropdownMenu.style.display = 'none';
     });
 
     // 時間割のみエクスポート
     document.getElementById('btn-export-timetable').addEventListener('click', () => {
         timetableIO.downloadTimetable();
         showToast('時間割データをエクスポートしました', 'success');
-        dataDropdown.classList.remove('show');
+        dataDropdownMenu.style.display = 'none';
     });
 
     // ファイルからインポート（ファイル選択ダイアログを開く）
     document.getElementById('btn-import-file').addEventListener('click', () => {
         document.getElementById('import-file-input').click();
-        dataDropdown.classList.remove('show');
+        dataDropdownMenu.style.display = 'none';
     });
 
     // ファイル選択後のインポート処理
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
 
     // 授業削除ボタン
-    document.getElementById('btn-clear-lesson').addEventListener('click', () => {
+    document.getElementById('btn-clear-lesson')?.addEventListener('click', () => {
         ui.clearLesson();
     });
 
@@ -211,16 +211,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 教科カテゴリ追加・科目追加ボタンは master_data.js で設定されるためここでは不要
 
     // 担当授業追加ボタン
-    document.getElementById('btn-add-assignment').addEventListener('click', () => {
+    document.getElementById('btn-add-assignment')?.addEventListener('click', () => {
         ui.addMasterAssignment();
     });
 
     // 時間数増減ボタン
-    document.getElementById('btn-hours-dec').addEventListener('click', () => {
+    document.getElementById('btn-hours-dec')?.addEventListener('click', () => {
         ui.adjustHours(-1);
     });
 
-    document.getElementById('btn-hours-inc').addEventListener('click', () => {
+    document.getElementById('btn-hours-inc')?.addEventListener('click', () => {
         ui.adjustHours(1);
     });
 
