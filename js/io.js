@@ -2,16 +2,20 @@
  * ============================================================
  * 時間割くん - データ入出力クラス
  * ============================================================
- * 
+ *
  * マスターデータと時間割のインポート/エクスポート機能を提供します。
- * 
+ *
  * ──────────────────────────────────────────────────
  * エクスポート形式（JSON）:
  *   - version: データ形式のバージョン
  *   - exportedAt: エクスポート日時
- *   - settings: 設定（時限数、クラス構成）
- *   - masters: マスターデータ（教員、教科・科目、選択グループ、担当授業）
+ *   - settings: 設定（時限数、クラス構成、勤務不可スロット）
+ *   - masters: マスターデータ
+ *       teachers, categories, subjects, electiveGroups,
+ *       assignments, classCurriculum
  *   - timetable: 時間割データ
+ *   - linkedGroups: 連動グループ
+ *   - parkingArea: パーキングエリア（一時保管授業）
  * ──────────────────────────────────────────────────
  */
 
@@ -40,7 +44,8 @@ class TimetableIO {
                 categories: this.store.categories,
                 subjects: this.store.subjects,
                 electiveGroups: this.store.electiveGroups,
-                assignments: this.store.assignments
+                assignments: this.store.assignments,
+                classCurriculum: this.store.classCurriculum
             }
         };
     }
@@ -55,7 +60,9 @@ class TimetableIO {
             exportedAt: new Date().toISOString(),
             type: 'timetable',
             data: {
-                timetable: this.store.timetable
+                timetable: this.store.timetable,
+                linkedGroups: this.store.linkedGroups,
+                parkingArea: this.store.parkingArea
             }
         };
     }
@@ -97,9 +104,12 @@ class TimetableIO {
                     categories: this.store.categories,
                     subjects: this.store.subjects,
                     electiveGroups: this.store.electiveGroups,
-                    assignments: this.store.assignments
+                    assignments: this.store.assignments,
+                    classCurriculum: this.store.classCurriculum
                 },
-                timetable: this.store.timetable
+                timetable: this.store.timetable,
+                linkedGroups: this.store.linkedGroups,
+                parkingArea: this.store.parkingArea
             }
         };
     }
@@ -252,11 +262,12 @@ class TimetableIO {
         }
 
         try {
-            const timetable = importData.type === 'full'
-                ? importData.data.timetable
-                : importData.data.timetable;
+            const data = importData.type === 'full' ? importData.data : importData.data;
 
-            this.store.timetable = timetable;
+            if (data.timetable) this.store.timetable = data.timetable;
+            if (data.linkedGroups) this.store.linkedGroups = data.linkedGroups;
+            if (data.parkingArea) this.store.parkingArea = data.parkingArea;
+
             this.store.saveToStorage();
             return { success: true, message: '時間割データをインポートしました' };
         } catch (error) {
@@ -382,6 +393,14 @@ class TimetableIO {
                 }
             });
         }
+
+        if (masters.classCurriculum) {
+            masters.classCurriculum.forEach(cc => {
+                if (!this.store.classCurriculum.find(e => e.id === cc.id)) {
+                    this.store.classCurriculum.push(cc);
+                }
+            });
+        }
     }
 
     /**
@@ -394,6 +413,7 @@ class TimetableIO {
         if (masters.subjects) this.store.subjects = masters.subjects;
         if (masters.electiveGroups) this.store.electiveGroups = masters.electiveGroups;
         if (masters.assignments) this.store.assignments = masters.assignments;
+        if (masters.classCurriculum) this.store.classCurriculum = masters.classCurriculum;
     }
 
     /**
