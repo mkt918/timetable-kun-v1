@@ -49,6 +49,13 @@ class DataStore {
         // クラス別カリキュラム: [{ id, classId, subjectId, weeklyHours }]
         this.classCurriculum = [];
 
+        // 担任設定: [{ classId, teacherId }]
+        this.homeroom = [];
+
+        // 分掌設定: [{ id, name }]
+        // 初期値は DEFAULT_DIVISIONS として別途定義
+        this.divisions = [];
+
         // 設定データ
         this.settings = {
             periods: 7,
@@ -259,6 +266,28 @@ class DataStore {
                 }
             }
 
+            // 担任設定読み込み
+            const homeroom = localStorage.getItem(STORAGE_KEYS.HOMEROOM);
+            if (homeroom) {
+                try {
+                    this.homeroom = JSON.parse(homeroom) || [];
+                } catch (e) {
+                    this.homeroom = [];
+                }
+            }
+
+            // 分掌設定読み込み（未設定なら初期値を使用）
+            const divisions = localStorage.getItem(STORAGE_KEYS.DIVISIONS);
+            if (divisions) {
+                try {
+                    this.divisions = JSON.parse(divisions) || [];
+                } catch (e) {
+                    this.divisions = this._defaultDivisions();
+                }
+            } else {
+                this.divisions = this._defaultDivisions();
+            }
+
             if (timetable) {
                 this.timetable = JSON.parse(timetable);
                 // データ構造のマイグレーション（Object -> Array）
@@ -434,6 +463,9 @@ class DataStore {
             localStorage.setItem(STORAGE_KEYS.PARKING_AREA, JSON.stringify(this.parkingArea));
             // クラス別カリキュラムも保存
             localStorage.setItem(STORAGE_KEYS.CLASS_CURRICULUM, JSON.stringify(this.classCurriculum));
+            // 担任・分掌設定も保存
+            localStorage.setItem(STORAGE_KEYS.HOMEROOM, JSON.stringify(this.homeroom));
+            localStorage.setItem(STORAGE_KEYS.DIVISIONS, JSON.stringify(this.divisions));
 
             // 容量使用率チェック（80%超過で警告）
             const usageKB = this._getStorageUsageKB();
@@ -549,6 +581,88 @@ class DataStore {
 
     getTeacher(id) {
         return this.teachers.find(t => t.id === id);
+    }
+
+    // ==========================================
+    // 担任設定管理
+    // ==========================================
+
+    /** 担任を設定（同クラスの既存担任は上書き） */
+    setHomeroom(classId, teacherId) {
+        this.homeroom = this.homeroom.filter(h => h.classId !== classId);
+        if (teacherId) {
+            this.homeroom.push({ classId, teacherId });
+        }
+        this.saveToStorage();
+    }
+
+    /** クラスの担任教員IDを取得 */
+    getHomeroomTeacher(classId) {
+        return this.homeroom.find(h => h.classId === classId)?.teacherId || null;
+    }
+
+    /** 教員の担任クラスIDを取得 */
+    getHomeroomClass(teacherId) {
+        return this.homeroom.find(h => h.teacherId === teacherId)?.classId || null;
+    }
+
+    // ==========================================
+    // 分掌設定管理
+    // ==========================================
+
+    /** 初期分掌リストを返す */
+    _defaultDivisions() {
+        return [
+            { id: 'div_kyoumu', name: '教務' },
+            { id: 'div_soumu', name: '総務' },
+            { id: 'div_seitou', name: '生徒指導' },
+            { id: 'div_shinro', name: '進路指導' },
+            { id: 'div_tokkatsu', name: '特別活動' },
+            { id: 'div_hoken', name: '保健' }
+        ];
+    }
+
+    /** 分掌を追加 */
+    addDivision(name) {
+        const id = `div_${Date.now()}_${++this._idSeq}`;
+        this.divisions.push({ id, name });
+        this.saveToStorage();
+        return id;
+    }
+
+    /** 分掌名を更新 */
+    updateDivision(id, name) {
+        const div = this.divisions.find(d => d.id === id);
+        if (!div) return;
+        div.name = name;
+        this.saveToStorage();
+    }
+
+    /** 分掌を削除 */
+    deleteDivision(id) {
+        this.divisions = this.divisions.filter(d => d.id !== id);
+        // 教員の分掌割当からも削除
+        this.teachers.forEach(t => {
+            if (t.divisions) {
+                t.divisions = t.divisions.filter(did => did !== id);
+            }
+        });
+        this.saveToStorage();
+    }
+
+    /** 教員に分掌を設定（複数可） */
+    setTeacherDivisions(teacherId, divisionIds) {
+        const teacher = this.teachers.find(t => t.id === teacherId);
+        if (!teacher) return;
+        teacher.divisions = divisionIds;
+        this.saveToStorage();
+    }
+
+    /** 分掌に属する教員ID一覧を取得 */
+    getTeachersByDivision(divisionId) {
+        return this.teachers
+            .filter(t => t.divisions && t.divisions.includes(divisionId))
+            .map(t => t.id);
     }
 
     // ==========================================

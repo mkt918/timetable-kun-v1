@@ -43,7 +43,9 @@ const STORAGE_KEYS = {
     LINKED_GROUPS: 'timetable_linked_groups',
     PARKING_AREA: 'timetable_parking_area',
     ELECTIVE_GROUPS: 'timetable_elective_groups',
-    CLASS_CURRICULUM: 'timetable_class_curriculum'
+    CLASS_CURRICULUM: 'timetable_class_curriculum',
+    HOMEROOM: 'timetable_homeroom',
+    DIVISIONS: 'timetable_divisions'
 };
 
 /**

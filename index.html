@@ -130,6 +130,8 @@
                     <button class="master-tab" data-tab="rooms">🏫 特別教室</button>
                     <button class="master-tab" data-tab="meetings">📅 会議・業務</button>
                     <button class="master-tab" data-tab="curriculum">📋 クラス別設定</button>
+                    <button class="master-tab" data-tab="homeroom">🏠 担任設定</button>
+                    <button class="master-tab" data-tab="divisions">🗂️ 分掌設定</button>
                     <button class="master-tab" data-tab="settings">⚙️ 設定</button>
                 </div>
                 <div class="master-content">
@@ -259,6 +261,14 @@
                                 <!-- 右パネル（カリキュラムテーブル）→ JS で生成 -->
                             </div>
                         </div>
+                    </div>
+                    <!-- 担任設定タブ -->
+                    <div id="master-homeroom" class="master-pane hidden">
+                        <!-- 担任設定が動的に生成される -->
+                    </div>
+                    <!-- 分掌設定タブ -->
+                    <div id="master-divisions" class="master-pane hidden">
+                        <!-- 分掌設定が動的に生成される -->
                     </div>
                     <!-- 設定タブ -->
                     <div id="master-settings" class="master-pane hidden">
@@ -501,6 +511,8 @@
     <script src="js/ui/master/RoomManager.js?v=2"></script>
     <script src="js/ui/master/MeetingManager.js?v=2"></script>
     <script src="js/ui/master/ClassCurriculumManager.js?v=2"></script>
+    <script src="js/ui/master/HomeroomManager.js"></script>
+    <script src="js/ui/master/DivisionManager.js"></script>
     <!-- Scheduler -->
     <script src="js/scheduler/AutoScheduler.js?v=2"></script>
     <script src="js/ui/AutoScheduleDialog.js?v=2"></script>

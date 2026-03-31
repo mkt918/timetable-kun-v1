@@ -19,6 +19,8 @@ class MasterDataManager {
         this._roomManager = new RoomManager(store, ui, this);
         this._meetingManager = new MeetingManager(store, ui, this);
         this._curriculumManager = new ClassCurriculumManager(store, ui, this);
+        this._homeroomManager = new HomeroomManager(store, ui, this);
+        this._divisionManager = new DivisionManager(store, ui, this);
     }
 
     openModal() {
@@ -78,6 +80,10 @@ class MasterDataManager {
             this.renderMeetings();
         } else if (tabName === 'curriculum') {
             this._curriculumManager.render();
+        } else if (tabName === 'homeroom') {
+            this._homeroomManager.render();
+        } else if (tabName === 'divisions') {
+            this._divisionManager.render();
         } else if (tabName === 'settings') {
             this.renderSettings();
         }
