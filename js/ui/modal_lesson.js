@@ -103,26 +103,40 @@ class LessonManager {
                 let hoursText = `残${remaining}/${totalHours}`;
                 if (remaining <= 0) hoursText = `✓${hoursText}`;
 
+                // 配置済みスロットの曜日+時限テキストを収集
+                const placedSlotLabels = [];
+                for (let d = 0; d < DAYS.length; d++) {
+                    for (let p = 0; p < PERIODS; p++) {
+                        const slots = this.store.getSlot(lesson.classId, d, p);
+                        if (slots.some(s => s.subjectId === lesson.subjectId && s.teacherIds && s.teacherIds.includes(teacherId))) {
+                            placedSlotLabels.push(`${DAYS[d]}${p + 1}`);
+                        }
+                    }
+                }
+                const placedSlotText = placedSlotLabels.length > 0
+                    ? `<span style="font-size:0.75em; color:#6b7280; margin-left:4px;">${placedSlotLabels.join('・')}</span>`
+                    : '';
+
                 // この授業が現在のスロットに配置されているかチェック（クラスIDも含める）
                 const isPlaced = currentSlots.some(slot =>
                     slot.subjectId === lesson.subjectId &&
                     slot.teacherIds.includes(teacherId) &&
                     slot.classId === lesson.classId
                 );
-                const placedBadge = isPlaced ? ' <span style="color: #4CAF50; font-size: 0.8em;">[TT]</span>' : '';
 
                 return `
                     <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
-                        <input type="checkbox" class="lesson-checkbox" 
-                               data-class-id="${lesson.classId}"
-                               data-subject-id="${lesson.subjectId}"
-                               ${isPlaced ? 'checked' : ''}
-                               style="margin-right: 8px;">
-                        <span class="lesson-subject" style="font-weight: 500;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
-                        <span class="lesson-class" style="margin-left: 8px; color: #666;">${escapeHtml(className)}</span>${placedBadge}
-                        <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="float: right; font-size: 0.9em;">
-                            ${hoursText}
-                        </span>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <input type="checkbox" class="lesson-checkbox"
+                                   data-class-id="${lesson.classId}"
+                                   data-subject-id="${lesson.subjectId}"
+                                   ${isPlaced ? 'checked' : ''}
+                                   style="flex-shrink:0;">
+                            <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
+                            <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(className)}</span>
+                            <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="margin-left:auto; font-size:0.82em; flex-shrink:0;">${hoursText}</span>
+                        </div>
+                        ${placedSlotText ? `<div style="padding-left:20px;">${placedSlotText}</div>` : ''}
                     </label>
                 `;
             }).join('');
@@ -260,35 +274,50 @@ class LessonManager {
         } else {
             const checkboxListHtml = assignments.map(lesson => {
                 const subject = this.store.getSubject(lesson.subjectId);
-                const clsName = CLASSES.find(c => c.id === lesson.classId)?.name || lesson.classId;
+                const teacher = this.store.getTeacher(lesson.teacherId);
 
-                const placedCount = this.store.countPlacedHours(teacherId, lesson.subjectId, lesson.classId);
+                const placedCount = this.store.countPlacedHours(lesson.teacherId, lesson.subjectId, lesson.classId);
                 const totalHours = lesson.weeklyHours;
                 const remaining = totalHours - placedCount;
                 const isCompleted = remaining <= 0;
                 let hoursText = `残${remaining}/${totalHours}`;
                 if (remaining <= 0) hoursText = `✓${hoursText}`;
 
+                // 配置済みスロットの曜日+時限テキストを収集
+                const placedSlotLabels = [];
+                for (let d = 0; d < DAYS.length; d++) {
+                    for (let p = 0; p < PERIODS; p++) {
+                        const slots = this.store.getSlot(lesson.classId, d, p);
+                        if (slots.some(s => s.subjectId === lesson.subjectId && s.teacherIds && s.teacherIds.includes(lesson.teacherId))) {
+                            placedSlotLabels.push(`${DAYS[d]}${p + 1}`);
+                        }
+                    }
+                }
+                const placedSlotText = placedSlotLabels.length > 0
+                    ? `<span style="font-size:0.75em; color:#6b7280; margin-left:4px;">${placedSlotLabels.join('・')}</span>`
+                    : '';
+
                 // この授業が現在のスロットに配置されているかチェック（クラスIDも含める）
                 const isPlaced = currentTeacherSlots.some(slot =>
                     slot.subjectId === lesson.subjectId &&
-                    slot.teacherIds.includes(teacherId) &&
+                    slot.teacherIds.includes(lesson.teacherId) &&
                     slot.classId === lesson.classId
                 );
-                const placedBadge = isPlaced ? ' <span style="color: #4CAF50; font-size: 0.8em;">[TT]</span>' : '';
 
                 return `
                     <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
-                        <input type="checkbox" class="lesson-checkbox" 
-                               data-class-id="${lesson.classId}"
-                               data-subject-id="${lesson.subjectId}"
-                               ${isPlaced ? 'checked' : ''}
-                               style="margin-right: 8px;">
-                        <span class="lesson-subject" style="font-weight: 500;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
-                        <span class="lesson-class" style="margin-left: 8px; color: #666;">${escapeHtml(clsName)}</span>${placedBadge}
-                        <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="float: right; font-size: 0.9em;">
-                            ${hoursText}
-                        </span>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <input type="checkbox" class="lesson-checkbox"
+                                   data-class-id="${lesson.classId}"
+                                   data-subject-id="${lesson.subjectId}"
+                                   data-teacher-id="${lesson.teacherId}"
+                                   ${isPlaced ? 'checked' : ''}
+                                   style="flex-shrink:0;">
+                            <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
+                            <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(teacher?.name || '')}</span>
+                            <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="margin-left:auto; font-size:0.82em; flex-shrink:0;">${hoursText}</span>
+                        </div>
+                        ${placedSlotText ? `<div style="padding-left:20px;">${placedSlotText}</div>` : ''}
                     </label>
                 `;
             }).join('');
