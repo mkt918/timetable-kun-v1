@@ -71,7 +71,11 @@ class LessonManager {
             };
         }
 
-        const assignments = this.store.getTeacherAssignments(teacherId);
+        // クラス別カリキュラムに登録済みの授業のみ表示
+        const allAssignments = this.store.getTeacherAssignments(teacherId);
+        const assignments = allAssignments.filter(a =>
+            this.store.classCurriculum.some(cc => cc.classId === a.classId && cc.subjectId === a.subjectId)
+        );
 
         if (assignments.length === 0) {
             listContainer.innerHTML = '<p class="placeholder-text">担当授業がありません</p>';
@@ -200,7 +204,11 @@ class LessonManager {
 
         infoContainer.innerHTML = `<div><strong>${escapeHtml(teacher?.name)}</strong> - ${DAYS[day]}曜 ${period + 1}限 - ${escapeHtml(className)}</div>` + roomSelectHtml;
 
-        const assignments = this.store.getTeacherAssignments(teacherId);
+        // クラス別カリキュラムに登録済みの授業のみ表示
+        const allAssignments = this.store.getTeacherAssignments(teacherId);
+        const assignments = allAssignments.filter(a =>
+            this.store.classCurriculum.some(cc => cc.classId === a.classId && cc.subjectId === a.subjectId)
+        );
 
         // 現在配置されている授業を取得（TT含む）
         const teacherSlots = this.store.getTeacherTimetable(teacherId);
@@ -790,8 +798,11 @@ class LessonManager {
         const className = CLASSES.find(c => c.id === classId)?.name || classId;
         const currentSlots = this.store.getSlot(classId, day, period);
 
-        // このクラスを担当している授業を持つ教員リストを取得
-        const classAssignments = this.store.assignments.filter(a => a.classId === classId);
+        // クラス別カリキュラムに登録済みの授業のみ表示
+        const classAssignments = this.store.assignments.filter(a =>
+            a.classId === classId &&
+            this.store.classCurriculum.some(cc => cc.classId === a.classId && cc.subjectId === a.subjectId)
+        );
         const teacherIds = [...new Set(classAssignments.map(a => a.teacherId))];
 
         if (teacherIds.length === 0) {

@@ -744,6 +744,22 @@ class ClassCurriculumManager {
                         this.store.addAssignment(tid, subjectId, classId, weeklyHours);
                         currentTeacherIds.add(tid);
                     }
+
+                    // 担当者数に応じて lessonType を自動切替
+                    const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
+                    if (cc) {
+                        const teacherCount = currentTeacherIds.size;
+                        const currentType = cc.lessonType || 'normal';
+                        if (teacherCount >= 2 && currentType !== 'tt') {
+                            // 2人以上 → 自動的にTT設定
+                            this.store.updateClassCurriculumOptions(cc.id, { lessonType: 'tt' });
+                            showToast(`担当が${teacherCount}名になりました。TT（複数教員）に自動設定しました`, 'info');
+                        } else if (teacherCount <= 1 && currentType === 'tt') {
+                            // 1人以下に戻ったら通常授業に戻す
+                            this.store.updateClassCurriculumOptions(cc.id, { lessonType: 'normal' });
+                        }
+                    }
+
                     renderTeacherList();
                     // 右パネルのみ更新（左パネルも更新してサマリーを反映しない）
                     this.renderCurriculumTable();
