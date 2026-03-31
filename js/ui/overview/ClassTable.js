@@ -134,10 +134,14 @@ class ClassTableRenderer {
             const linkedCount = this.store.getLinkedLessons(cls.id, dayIndex, period).length;
             const linkIndicator = linkedCount > 1 ? `<span class="link-badge" title="連動: ${linkedCount}件">🔗</span>` : '';
 
-            const teacherNames = slot.teacherIds.map(tid => {
+            const allTeachers = slot.teacherIds.map(tid => {
                 const t = this.store.getTeacher(tid);
                 return t ? t.name : '不明';
-            }).join('・');
+            });
+            // 3人以上は先頭2人 + 人数表示に省略
+            const teacherNames = allTeachers.length >= 3
+                ? `${allTeachers.slice(0, 2).join('・')}他${allTeachers.length - 2}名`
+                : allTeachers.join('・');
 
             // 使用教室
             let roomNames = '';
