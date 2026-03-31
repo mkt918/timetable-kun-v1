@@ -215,31 +215,14 @@ class TeacherTableRenderer {
             html += '<span class="tt-badge">TT</span>';
         }
 
-        // 同一科目でグループ化して表示（合同授業は科目名を省略しクラスをまとめる）
-        const subjectGroups = {};
-        const subjectOrder = [];
+        // getTeacherTimetable が同一科目をマージ済みなので1件ずつ描画するだけ
         slots.forEach(slot => {
-            const key = slot.subjectId || '__unknown__';
-            if (!subjectGroups[key]) {
-                subjectGroups[key] = { subjectName: slot.subjectName, slots: [] };
-                subjectOrder.push(key);
-            }
-            subjectGroups[key].slots.push(slot);
-        });
-
-        subjectOrder.forEach(subjectId => {
-            const group = subjectGroups[subjectId];
-            const groupSlots = group.slots;
-
-            // 最初のスロットから連動バッジ取得
-            const firstSlot = groupSlots[0];
-            const linkedCount = this.store.getLinkedLessons(firstSlot.classId, dayIndex, period).length;
+            const linkedCount = this.store.getLinkedLessons(slot.classId, dayIndex, period).length;
             const linkIndicator = linkedCount > 1 ? `<span class="link-badge" title="連動: ${linkedCount}件">🔗</span>` : '';
 
-            // 教室名（全スロット共通として最初から取得）
             let roomNames = '';
-            if (firstSlot.specialClassroomIds && firstSlot.specialClassroomIds.length > 0) {
-                const names = firstSlot.specialClassroomIds.map(rid => {
+            if (slot.specialClassroomIds && slot.specialClassroomIds.length > 0) {
+                const names = slot.specialClassroomIds.map(rid => {
                     const r = this.store.getSpecialClassroom(rid);
                     return r ? (r.shortName || r.name) : '';
                 }).filter(n => n);
@@ -248,21 +231,15 @@ class TeacherTableRenderer {
                 }
             }
 
-            if (groupSlots.length > 1) {
-                // 同一科目・複数クラス → 科目名1回 + クラスを圧縮表示（例: 3-1234）
-                const classLabel = formatJointClassNames(groupSlots.map(s => s.className));
-                html += `<div class="cell-content-multi">
-                    <span class="cell-subject">${linkIndicator}${group.subjectName}</span>
-                    <span class="cell-class">${classLabel} ${roomNames}</span>
-                </div>`;
-            } else {
-                // 単独科目はそのまま短縮表示（例: 3-1）
-                const classLabel = toShortClassName(firstSlot.className);
-                html += `<div class="cell-content-multi">
-                    <span class="cell-subject">${linkIndicator}${group.subjectName}</span>
-                    <span class="cell-class">${classLabel} ${roomNames}</span>
-                </div>`;
-            }
+            // classNames に複数クラスが入っている場合は圧縮表示
+            const classLabel = (slot.classNames && slot.classNames.length > 1)
+                ? formatJointClassNames(slot.classNames)
+                : toShortClassName(slot.className);
+
+            html += `<div class="cell-content-multi">
+                <span class="cell-subject">${linkIndicator}${slot.subjectName}</span>
+                <span class="cell-class">${classLabel} ${roomNames}</span>
+            </div>`;
         });
 
         if (isJoint) {

@@ -306,31 +306,16 @@ class OverviewRenderer {
                             html += '<span class="tt-badge">TT</span>';
                         }
 
-                        // 同一科目でグループ化（合同授業は科目名1回＋クラスを圧縮表示）
-                        const subjectGroups = {};
-                        const subjectOrder = [];
+                        // getTeacherTimetable が同一科目をマージ済みなので1件ずつ描画するだけ
                         slots.forEach(slot => {
-                            const key = slot.subjectId || '__unknown__';
-                            if (!subjectGroups[key]) {
-                                subjectGroups[key] = { subjectName: slot.subjectName, slots: [] };
-                                subjectOrder.push(key);
-                            }
-                            subjectGroups[key].slots.push(slot);
-                        });
-
-                        subjectOrder.forEach(subjectId => {
-                            const group = subjectGroups[subjectId];
-                            const groupSlots = group.slots;
-                            const firstSlot = groupSlots[0];
-
-                            const linkedCount = this.store.getLinkedLessons(firstSlot.classId, dayIndex, period).length;
+                            const linkedCount = this.store.getLinkedLessons(slot.classId, dayIndex, period).length;
                             const linkIndicator = linkedCount > 1
                                 ? `<span class="link-badge" title="連動: ${linkedCount}件">🔗</span>`
                                 : '';
 
                             let roomNames = '';
-                            if (firstSlot.specialClassroomIds && firstSlot.specialClassroomIds.length > 0) {
-                                const names = firstSlot.specialClassroomIds.map(rid => {
+                            if (slot.specialClassroomIds && slot.specialClassroomIds.length > 0) {
+                                const names = slot.specialClassroomIds.map(rid => {
                                     const r = this.store.getSpecialClassroom(rid);
                                     return r ? (r.shortName || r.name) : '';
                                 }).filter(n => n);
@@ -339,13 +324,14 @@ class OverviewRenderer {
                                 }
                             }
 
-                            const classLabel = groupSlots.length > 1
-                                ? formatJointClassNames(groupSlots.map(s => s.className))
-                                : toShortClassName(firstSlot.className);
+                            // classNames に複数クラスが入っている場合は圧縮表示
+                            const classLabel = (slot.classNames && slot.classNames.length > 1)
+                                ? formatJointClassNames(slot.classNames)
+                                : toShortClassName(slot.className);
 
                             html += `
                                 <div class="cell-content-multi">
-                                    <span class="cell-subject">${linkIndicator}${escapeHtml(group.subjectName)}</span>
+                                    <span class="cell-subject">${linkIndicator}${escapeHtml(slot.subjectName)}</span>
                                     <span class="cell-class">${escapeHtml(classLabel)} ${roomNames}</span>
                                 </div>
                             `;

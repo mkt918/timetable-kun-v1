@@ -1742,7 +1742,32 @@ class DataStore {
                 });
 
                 if (cellData.length > 0) {
-                    result[key] = cellData;
+                    // 同一科目を1エントリに統合（合同授業は classNames にまとめる）
+                    const merged = [];
+                    const seen = {};
+                    cellData.forEach(item => {
+                        const sid = item.subjectId || '__unknown__';
+                        if (seen[sid]) {
+                            // 同一科目 → クラス情報を追記
+                            seen[sid].classNames.push(item.className);
+                            seen[sid].classIds.push(item.classId);
+                        } else {
+                            const entry = {
+                                classId: item.classId,
+                                className: item.className,
+                                classIds: [item.classId],
+                                classNames: [item.className],
+                                subjectId: item.subjectId,
+                                subjectName: item.subjectName,
+                                teacherIds: item.teacherIds,
+                                isTT: item.isTT,
+                                specialClassroomIds: item.specialClassroomIds
+                            };
+                            seen[sid] = entry;
+                            merged.push(entry);
+                        }
+                    });
+                    result[key] = merged;
                 }
             }
         }
