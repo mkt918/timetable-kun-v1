@@ -513,27 +513,22 @@ class DataStore {
     // ■ セクション2: データのCRUD操作（基本マスター管理）
     // ══════════════════════════════════════════════════════════
 
-    addTeacher(id, name, categoryIds = [], homeroom = '', divisions = []) {
+    addTeacher(id, name, categoryIds = []) {
         if (this.teachers.find(t => t.id === id)) {
             return { success: false, message: '同じIDの教員が存在します' };
         }
-        this.teachers.push({
-            id, name,
-            categoryIds: categoryIds || [],
-            homeroom: homeroom || '',       // 担任クラス名（例: "1年1組"）
-            divisions: divisions || []      // 分掌（例: ["教務", "学年主任"]）
-        });
+        this.teachers.push({ id, name, categoryIds: categoryIds || [] });
         this.saveToStorage();
         return { success: true };
     }
 
-    updateTeacher(id, name, categoryIds = null, homeroom = null, divisions = null) {
+    updateTeacher(id, name, categoryIds = null) {
         const teacher = this.teachers.find(t => t.id === id);
         if (!teacher) return { success: false, message: '教員が見つかりません' };
         teacher.name = name;
-        if (categoryIds !== null) teacher.categoryIds = categoryIds;
-        if (homeroom !== null) teacher.homeroom = homeroom;
-        if (divisions !== null) teacher.divisions = divisions;
+        if (categoryIds !== null) {
+            teacher.categoryIds = categoryIds;
+        }
         this.saveToStorage();
         return { success: true };
     }
