@@ -31,7 +31,7 @@ class CSVManager {
     // 教員 CSV
     // ============================================
     exportTeachers() {
-        const rows = [['教科', '名前']];
+        const rows = [['教科', '名前', '担任クラス', '分掌']];
         this.store.teachers.forEach(t => {
             // 教科名を取得（複数の場合は・で結合）
             let categoryNames = '';
@@ -41,7 +41,9 @@ class CSVManager {
                     .filter(c => c);
                 categoryNames = categories.map(c => c.name).join('・');
             }
-            rows.push([categoryNames, t.name]);
+            const homeroom = t.homeroom || '';
+            const divisions = (t.divisions || []).join('・');
+            rows.push([categoryNames, t.name, homeroom, divisions]);
         });
 
         // ファイル名: yymmdd_教員マスタ.csv
@@ -63,47 +65,69 @@ class CSVManager {
                 const lines = text.split(/\r\n|\n/);
                 let count = 0;
 
-                // ヘッダースキップ判定（教科,名前 形式を想定）
-                const startIndex = (lines[0].trim() === '教科,名前' || lines[0].trim() === '名前') ? 1 : 0;
+                // ヘッダー行を検出してスキップ
+                const firstLine = lines[0].trim();
+                const startIndex = (firstLine.startsWith('教科') || firstLine.startsWith('名前')) ? 1 : 0;
 
                 for (let i = startIndex; i < lines.length; i++) {
                     const line = lines[i].trim();
                     if (!line) continue;
 
-                    // CSV解析（教科,名前 形式）
+                    // CSV解析（教科,名前,担任クラス,分掌 形式）
                     const parts = line.split(',').map(p => p.trim());
                     let categoryNames = '';
                     let name = '';
+                    let homeroom = '';
+                    let divisionStr = '';
 
-                    if (parts.length >= 2) {
-                        // 教科,名前 形式
+                    if (parts.length >= 4) {
+                        // 教科,名前,担任クラス,分掌
+                        categoryNames = parts[0];
+                        name = parts[1];
+                        homeroom = parts[2];
+                        divisionStr = parts[3];
+                    } else if (parts.length === 3) {
+                        // 教科,名前,担任クラス
+                        categoryNames = parts[0];
+                        name = parts[1];
+                        homeroom = parts[2];
+                    } else if (parts.length === 2) {
+                        // 教科,名前
                         categoryNames = parts[0];
                         name = parts[1];
                     } else if (parts.length === 1) {
-                        // 名前のみ
                         name = parts[0];
                     }
 
                     if (!name) continue;
 
-                    // 既存チェック（名前で判定）
+                    // 教科IDを解決
+                    let categoryIds = [];
+                    if (categoryNames) {
+                        categoryNames.split('・').map(n => n.trim()).forEach(catName => {
+                            const cat = this.store.categories.find(c => c.name === catName);
+                            if (cat) categoryIds.push(cat.id);
+                        });
+                    }
+
+                    // 分掌を配列に変換（・区切り）
+                    const divisions = divisionStr
+                        ? divisionStr.split('・').map(d => d.trim()).filter(d => d)
+                        : [];
+
+                    // 既存チェック（名前で判定）→ 既存なら担任・分掌を更新
                     const existing = this.store.teachers.find(t => t.name === name);
-                    if (!existing) {
+                    if (existing) {
+                        // 既存教員の担任・分掌を更新（教科も更新）
+                        this.store.updateTeacher(
+                            existing.id, name,
+                            categoryIds.length > 0 ? categoryIds : existing.categoryIds,
+                            homeroom || existing.homeroom || '',
+                            divisions.length > 0 ? divisions : (existing.divisions || [])
+                        );
+                    } else {
                         const newId = `t_${Date.now()}_${i}`;
-
-                        // 教科IDを取得
-                        let categoryIds = [];
-                        if (categoryNames) {
-                            const catNames = categoryNames.split('・').map(n => n.trim());
-                            catNames.forEach(catName => {
-                                const category = this.store.categories.find(c => c.name === catName);
-                                if (category) {
-                                    categoryIds.push(category.id);
-                                }
-                            });
-                        }
-
-                        this.store.addTeacher(newId, name, categoryIds);
+                        this.store.addTeacher(newId, name, categoryIds, homeroom, divisions);
                         count++;
                     }
                 }
