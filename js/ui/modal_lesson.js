@@ -124,19 +124,34 @@ class LessonManager {
                     slot.classId === lesson.classId
                 );
 
+                // この時限にこのクラスが既に別の授業を持っているかチェック
+                const classSlots = this.store.getSlot(lesson.classId, day, period);
+                const blockingSlot = classSlots.find(s =>
+                    !(s.subjectId === lesson.subjectId && s.teacherIds && s.teacherIds.includes(teacherId))
+                );
+                const blockingSubjectName = blockingSlot
+                    ? this.store.getSubject(blockingSlot.subjectId)?.name || '他の授業'
+                    : null;
+                const isBlocked = !!blockingSubjectName;
+                const blockedText = isBlocked
+                    ? `<div style="padding-left:20px; font-size:0.75em; color:#dc2626;">⚠ この時限は「${escapeHtml(blockingSubjectName)}」が入っています</div>`
+                    : '';
+
                 return `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: ${isBlocked ? 'default' : 'pointer'}; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'}; opacity: ${isBlocked ? '0.75' : '1'};">
                         <div style="display:flex; align-items:center; gap:4px;">
                             <input type="checkbox" class="lesson-checkbox"
                                    data-class-id="${lesson.classId}"
                                    data-subject-id="${lesson.subjectId}"
                                    ${isPlaced ? 'checked' : ''}
+                                   ${isBlocked ? 'disabled' : ''}
                                    style="flex-shrink:0;">
                             <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
                             <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(className)}</span>
                             <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="margin-left:auto; font-size:0.82em; flex-shrink:0;">${hoursText}</span>
                         </div>
                         ${placedSlotText ? `<div style="padding-left:20px;">${placedSlotText}</div>` : ''}
+                        ${blockedText}
                     </label>
                 `;
             }).join('');
@@ -304,20 +319,35 @@ class LessonManager {
                     slot.classId === lesson.classId
                 );
 
+                // この時限にこのクラスが既に別の授業を持っているかチェック
+                const classSlots = this.store.getSlot(lesson.classId, day, period);
+                const blockingSlot = classSlots.find(s =>
+                    !(s.subjectId === lesson.subjectId && s.teacherIds && s.teacherIds.includes(lesson.teacherId))
+                );
+                const blockingSubjectName = blockingSlot
+                    ? this.store.getSubject(blockingSlot.subjectId)?.name || '他の授業'
+                    : null;
+                const isBlocked = !!blockingSubjectName;
+                const blockedText = isBlocked
+                    ? `<div style="padding-left:20px; font-size:0.75em; color:#dc2626;">⚠ この時限は「${escapeHtml(blockingSubjectName)}」が入っています</div>`
+                    : '';
+
                 return `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: ${isBlocked ? 'default' : 'pointer'}; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'}; opacity: ${isBlocked ? '0.75' : '1'};">
                         <div style="display:flex; align-items:center; gap:4px;">
                             <input type="checkbox" class="lesson-checkbox"
                                    data-class-id="${lesson.classId}"
                                    data-subject-id="${lesson.subjectId}"
                                    data-teacher-id="${lesson.teacherId}"
                                    ${isPlaced ? 'checked' : ''}
+                                   ${isBlocked ? 'disabled' : ''}
                                    style="flex-shrink:0;">
                             <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
                             <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(teacher?.name || '')}</span>
                             <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="margin-left:auto; font-size:0.82em; flex-shrink:0;">${hoursText}</span>
                         </div>
                         ${placedSlotText ? `<div style="padding-left:20px;">${placedSlotText}</div>` : ''}
+                        ${blockedText}
                     </label>
                 `;
             }).join('');

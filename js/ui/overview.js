@@ -954,13 +954,13 @@ class OverviewRenderer {
                             const subjectName = subject ? subject.shortName : '不明';
                             const teacherNames = lesson.teacherIds.map(tid => {
                                 const t = this.store.getTeacher(tid);
-                                return t ? t.name : '不明';
+                                return t ? t.name.substring(0, 2) : '不明';
                             }).join('・');
 
                             html += `
                                 <div class="cell-content-multi">
                                     <span class="cell-subject">${escapeHtml(lesson.className)}</span>
-                                    <span class="cell-class">${escapeHtml(subjectName)} / ${escapeHtml(teacherNames)}</span>
+                                    <span class="cell-class">${escapeHtml(subjectName)}/${escapeHtml(teacherNames)}</span>
                                 </div>
                             `;
                         });
