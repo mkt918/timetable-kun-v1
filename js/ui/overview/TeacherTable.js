@@ -113,10 +113,25 @@ class TeacherTableRenderer {
         });
 
         // 担当授業で登録された総コマ数（分母）
+        // 合同授業は何クラス一緒でも1コマとしてカウント
         let totalCount = 0;
         const assignments = this.store.assignments.filter(a => a.teacherId === teacher.id);
+        const countedKeys = new Set();
         assignments.forEach(a => {
-            totalCount += a.weeklyHours || 0;
+            const cc = this.store.classCurriculum.find(
+                c => c.classId === a.classId && c.subjectId === a.subjectId
+            );
+            let key;
+            if (cc && cc.jointClassIds && cc.jointClassIds.length > 0) {
+                const groupIds = [a.classId, ...cc.jointClassIds].sort();
+                key = `${a.subjectId}-${groupIds[0]}`;
+            } else {
+                key = `${a.subjectId}-${a.classId}`;
+            }
+            if (!countedKeys.has(key)) {
+                countedKeys.add(key);
+                totalCount += a.weeklyHours || 0;
+            }
         });
 
         return { current: currentCount, total: totalCount };

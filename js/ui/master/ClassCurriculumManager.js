@@ -220,6 +220,16 @@ class ClassCurriculumManager {
                            </div>`
                         : '';
 
+                    // デフォルト特別教室
+                    const defaultRoomIds = cc.defaultRoomIds || [];
+                    const allRooms = this.store.specialClassrooms || [];
+                    const roomBadges = defaultRoomIds.length > 0
+                        ? defaultRoomIds.map(rid => {
+                            const r = this.store.getSpecialClassroom(rid);
+                            return r ? `<span style="background:#eff6ff; color:#1d4ed8; font-size:0.72em; padding:1px 7px; border-radius:12px; font-weight:500;">${escapeHtml(r.shortName || r.name)}</span>` : '';
+                        }).filter(s => s).join('')
+                        : `<span style="color:#9ca3af; font-size:0.72em;">なし</span>`;
+
                     const selectStyle = 'font-size:0.75em; border:1px solid #e5e7eb; border-radius:5px; padding:2px 4px; background:#f9fafb; color:#374151; cursor:pointer; max-width:100%;';
 
                     return `
@@ -271,6 +281,16 @@ class ClassCurriculumManager {
                                     </label>
                                 </div>
                                 ${jointChips}
+                                <!-- デフォルト特別教室 -->
+                                ${allRooms.length > 0 ? `
+                                <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:2px;">
+                                    <span style="font-size:0.72em; color:#9ca3af; flex-shrink:0;">教室:</span>
+                                    ${roomBadges}
+                                    <button class="cc-btn-room" data-id="${escapeHtml(cc.id)}"
+                                        style="font-size:0.7em; padding:1px 7px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:4px; cursor:pointer; flex-shrink:0;">
+                                        設定
+                                    </button>
+                                </div>` : ''}
                             </div>
 
                             <!-- アクションボタン -->
@@ -437,6 +457,103 @@ class ClassCurriculumManager {
                 if (cc) this.openJointClassDialog(cc);
             };
         });
+
+        // 特別教室設定ボタン
+        panel.querySelectorAll('.cc-btn-room').forEach(btn => {
+            btn.onclick = () => {
+                const cc = this.store.classCurriculum.find(c => c.id === btn.dataset.id);
+                if (cc) this.openRoomSelectDialog(cc);
+            };
+        });
+    }
+
+    // ─── 特別教室選択ダイアログ ──────────────────────────────────────
+
+    openRoomSelectDialog(cc) {
+        const cls = CLASSES.find(c => c.id === cc.classId);
+        const sub = this.store.getSubject(cc.subjectId);
+        const className = cls ? cls.name : cc.classId;
+        const subName = sub ? sub.name : '不明';
+        const allRooms = this.store.specialClassrooms || [];
+
+        const currentIds = new Set(cc.defaultRoomIds || []);
+
+        const overlay = document.createElement('div');
+        overlay.className = 'dialog-overlay';
+
+        const renderContent = () => {
+            const items = allRooms.map(r => {
+                const checked = currentIds.has(r.id);
+                return `
+                    <label class="cc-room-row" data-room-id="${escapeHtml(r.id)}"
+                        style="display:flex; align-items:center; gap:10px; padding:8px 12px; margin:2px 0;
+                               border-radius:7px; cursor:pointer;
+                               border:1px solid ${checked ? '#bfdbfe' : '#e5e7eb'};
+                               background:${checked ? '#eff6ff' : '#fff'};">
+                        <input type="checkbox" ${checked ? 'checked' : ''}
+                            style="accent-color:#1d4ed8; width:16px; height:16px; cursor:pointer;">
+                        <span style="font-size:0.9em; font-weight:${checked ? '600' : '400'}; color:${checked ? '#1d4ed8' : '#374151'};">
+                            ${escapeHtml(r.name)}${r.shortName && r.shortName !== r.name ? `<span style="color:#6b7280; font-size:0.85em; margin-left:5px;">(${escapeHtml(r.shortName)})</span>` : ''}
+                        </span>
+                    </label>
+                `;
+            }).join('') || '<p style="color:#aaa; text-align:center; padding:16px;">特別教室が登録されていません</p>';
+
+            overlay.innerHTML = `
+                <div class="dialog-content" style="width:360px; max-width:90vw;">
+                    <h3 style="margin:0 0 4px; font-size:1em; font-weight:700;">デフォルト特別教室を設定</h3>
+                    <p style="margin:0 0 12px; font-size:0.82em; color:#6b7280;">
+                        <strong>${escapeHtml(className)}</strong> の「${escapeHtml(subName)}」で使用する教室を選択してください<br>
+                        <span style="font-size:0.9em; color:#9ca3af;">授業配置時のデフォルト値になります（個別変更も可能）</span>
+                    </p>
+                    <div style="border:1px solid #e5e7eb; border-radius:8px; padding:6px; max-height:300px; overflow-y:auto;">
+                        ${items}
+                    </div>
+                    <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
+                        <button id="cc-room-cancel" class="btn btn-secondary">キャンセル</button>
+                        <button id="cc-room-ok" class="btn btn-primary">保存</button>
+                    </div>
+                </div>
+            `;
+
+            overlay.querySelectorAll('.cc-room-row').forEach(row => {
+                row.onclick = (e) => {
+                    if (e.target.tagName === 'INPUT') return;
+                    const cb = row.querySelector('input[type=checkbox]');
+                    const rid = row.dataset.roomId;
+                    if (cb.checked) {
+                        cb.checked = false;
+                        currentIds.delete(rid);
+                    } else {
+                        cb.checked = true;
+                        currentIds.add(rid);
+                    }
+                    renderContent();
+                };
+                const cb = row.querySelector('input[type=checkbox]');
+                cb.onchange = () => {
+                    const rid = row.dataset.roomId;
+                    if (cb.checked) {
+                        currentIds.add(rid);
+                    } else {
+                        currentIds.delete(rid);
+                    }
+                    renderContent();
+                };
+            });
+
+            overlay.querySelector('#cc-room-cancel').onclick = () => overlay.remove();
+            overlay.querySelector('#cc-room-ok').onclick = () => {
+                this.store.updateClassCurriculumOptions(cc.id, { defaultRoomIds: [...currentIds] });
+                overlay.remove();
+                this.renderCurriculumTable();
+                showToast('特別教室のデフォルト設定を保存しました', 'success');
+            };
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        };
+
+        renderContent();
+        document.body.appendChild(overlay);
     }
 
     // ─── 合同クラス選択ダイアログ ────────────────────────────────────

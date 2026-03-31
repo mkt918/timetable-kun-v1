@@ -828,7 +828,7 @@ class DataStore {
     /**
      * クラスカリキュラムの授業形態オプションを更新
      * @param {string} id
-     * @param {{ consecutivePeriods?: number, lessonType?: string, jointClassIds?: string[] }} options
+     * @param {{ consecutivePeriods?: number, lessonType?: string, jointClassIds?: string[], defaultRoomIds?: string[] }} options
      */
     updateClassCurriculumOptions(id, options) {
         const item = this.classCurriculum.find(c => c.id === id);
@@ -845,6 +845,10 @@ class DataStore {
         if (options.jointClassIds !== undefined) {
             // 双方向リンクを同期（jointClassIds の変更は必ず _syncJointGroup 経由で行う）
             this._syncJointGroup(item.classId, item.subjectId, options.jointClassIds);
+        }
+        if (options.defaultRoomIds !== undefined) {
+            // デフォルト特別教室IDs（授業配置時の初期値として使用）
+            item.defaultRoomIds = Array.isArray(options.defaultRoomIds) ? options.defaultRoomIds.filter(id => id) : [];
         }
         this.saveToStorage();
         return { success: true };

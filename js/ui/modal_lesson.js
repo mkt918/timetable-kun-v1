@@ -137,6 +137,33 @@ class LessonManager {
             `;
         }
 
+        // 授業チェックボックス変更時：初めてチェックをつけた授業のデフォルト教室を反映
+        const applyDefaultRooms = () => {
+            // 既にスロットが配置済みなら変更しない
+            if (currentSlots.length > 0) return;
+            const checkedBoxes = Array.from(document.querySelectorAll('.lesson-checkbox:checked'));
+            if (checkedBoxes.length === 0) return;
+            // 最初にチェックされた授業のデフォルト教室を取得
+            const first = checkedBoxes[0];
+            const ccEntry = this.store.classCurriculum.find(
+                c => c.classId === first.dataset.classId && c.subjectId === first.dataset.subjectId
+            );
+            if (!ccEntry || !ccEntry.defaultRoomIds || ccEntry.defaultRoomIds.length === 0) return;
+            // 教室チェックボックスにデフォルト値を反映（まだ何も選択されていない場合のみ）
+            const roomCheckboxes = Array.from(document.querySelectorAll('.room-checkbox:checked'));
+            if (roomCheckboxes.length === 0) {
+                ccEntry.defaultRoomIds.forEach(rid => {
+                    const cb = document.querySelector(`.room-checkbox[value="${rid}"]`);
+                    if (cb) cb.checked = true;
+                });
+                // アコーディオンを開く
+                const body = document.getElementById('room-accordion-body');
+                const arrow = document.getElementById('room-accordion-arrow');
+                if (body) body.style.display = 'block';
+                if (arrow) arrow.textContent = '▼';
+            }
+        };
+
         // 登録ボタンのイベント
         const registerBtn = document.getElementById('btn-register-lessons');
         if (registerBtn) {
@@ -146,6 +173,11 @@ class LessonManager {
                 this.registerMultipleLessons(teacherId, day, period, selectedCheckboxes);
             };
         }
+
+        // 授業チェックボックスにchangeイベントを追加
+        listContainer.querySelectorAll('.lesson-checkbox').forEach(cb => {
+            cb.addEventListener('change', applyDefaultRooms);
+        });
 
         modal.querySelector('.modal-close').onclick = () => this.close();
         modal.classList.remove('hidden');
@@ -180,6 +212,14 @@ class LessonManager {
                 currentRoomIds = slot.specialClassroomIds;
             } else if (slot.specialClassroomId) {
                 currentRoomIds = [slot.specialClassroomId];
+            }
+        }
+        // スロットに教室未設定の場合、カリキュラムのデフォルト教室を使用
+        if (currentRoomIds.length === 0) {
+            const ccEntry = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId ===
+                (currentSlot && currentSlot.length > 0 ? currentSlot[0].subjectId : null));
+            if (ccEntry && ccEntry.defaultRoomIds && ccEntry.defaultRoomIds.length > 0) {
+                currentRoomIds = ccEntry.defaultRoomIds;
             }
         }
 

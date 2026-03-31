@@ -201,10 +201,26 @@ class OverviewRenderer {
             });
 
             // 担当授業で登録された総コマ数（分母）
+            // 合同授業は何クラス一緒でも1コマとしてカウント
             let totalCount = 0;
             const assignments = this.store.assignments.filter(a => a.teacherId === teacher.id);
+            const countedKeys = new Set(); // "subjectId-代表classId" で重複除去
             assignments.forEach(a => {
-                totalCount += a.weeklyHours || 0;
+                const cc = this.store.classCurriculum.find(
+                    c => c.classId === a.classId && c.subjectId === a.subjectId
+                );
+                // 合同グループの代表クラスを決定（jointClassIdsがある場合、全IDをソートして最小を代表とする）
+                let key;
+                if (cc && cc.jointClassIds && cc.jointClassIds.length > 0) {
+                    const groupIds = [a.classId, ...cc.jointClassIds].sort();
+                    key = `${a.subjectId}-${groupIds[0]}`;
+                } else {
+                    key = `${a.subjectId}-${a.classId}`;
+                }
+                if (!countedKeys.has(key)) {
+                    countedKeys.add(key);
+                    totalCount += a.weeklyHours || 0;
+                }
             });
 
             // 表示形式: 5/18コマ（分母が0の場合は「5コマ」）
@@ -796,11 +812,14 @@ class OverviewRenderer {
                             const linkIndicator = linkedCount > 1
                                 ? `<span class="link-badge" title="連動: ${linkedCount}件">🔗</span>`
                                 : '';
-                            // 教員名は2文字に短縮
-                            const teacherNames = slot.teacherIds.map(tid => {
+                            // 教員名は2文字に短縮、3人以上は省略
+                            const allTeacherNames = slot.teacherIds.map(tid => {
                                 const t = this.store.getTeacher(tid);
                                 return t ? t.name.slice(0, 2) : '不明';
-                            }).join('・');
+                            });
+                            const teacherNames = allTeacherNames.length >= 3
+                                ? `${allTeacherNames.slice(0, 2).join('・')}他${allTeacherNames.length - 2}名`
+                                : allTeacherNames.join('・');
 
                             // 使用教室表示（新形式: specialClassroomIds, 旧形式: specialClassroomId）
                             let roomNames = '';
