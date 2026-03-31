@@ -939,18 +939,68 @@ class DataStore {
         const lessonType  = cc ? (cc.lessonType || 'normal') : 'normal';
         // isTT: 独立TTフラグ（lessonType === 'tt' との後方互換も維持）
         const isTT = cc ? (cc.isTT === true || lessonType === 'tt') : false;
-        // skipJoint=true のとき合同クラスへの自動展開をしない
-        const jointClassIds = (!skipJoint && lessonType === 'joint' && cc?.jointClassIds?.length > 0)
-            ? cc.jointClassIds : [];
+
+        // ── 合同クラス自動解決（教員セット完全一致） ──────────────────
+        // skipJoint=false かつ lessonType が joint でない場合でも、
+        // 同学年・同科目で担当教員セットが完全一致するクラスを自動検出して合同展開する。
+        // jointClassIds の手動設定より自動解決を優先する。
+        let jointClassIds = (!skipJoint && lessonType === 'joint' && cc?.jointClassIds?.length > 0)
+            ? [...cc.jointClassIds] : [];
+
+        if (!skipJoint) {
+            // 起点クラスの担当教員セット
+            const baseTeacherSet = new Set(
+                this.assignments
+                    .filter(a => a.classId === classId && a.subjectId === subjectId)
+                    .map(a => a.teacherId)
+            );
+
+            if (baseTeacherSet.size >= 2) {
+                // 同学年の他クラスで同科目が登録されているものを検索
+                const baseClass = CLASSES.find(c => c.id === classId);
+                if (baseClass) {
+                    CLASSES.forEach(cls => {
+                        if (cls.id === classId || cls.grade !== baseClass.grade) return;
+                        // このクラスに同科目のカリキュラム登録があるか
+                        const peerCc = this.classCurriculum.find(
+                            c => c.classId === cls.id && c.subjectId === subjectId
+                        );
+                        if (!peerCc) return;
+                        // 担当教員セットを取得
+                        const peerTeacherSet = new Set(
+                            this.assignments
+                                .filter(a => a.classId === cls.id && a.subjectId === subjectId)
+                                .map(a => a.teacherId)
+                        );
+                        // 完全一致チェック（サイズ同じかつ全要素が一致）
+                        if (peerTeacherSet.size === baseTeacherSet.size &&
+                            [...baseTeacherSet].every(tid => peerTeacherSet.has(tid))) {
+                            if (!jointClassIds.includes(cls.id)) {
+                                jointClassIds.push(cls.id);
+                            }
+                        }
+                    });
+                }
+            }
+        }
 
         // TT: skipTT=false のとき assignments から全担当教員を追加（重複除去）
         // skipTT=true の場合は呼び出し元で解決済みの teacherIds をそのまま使う
+        // 合同展開する場合は全クラスの担当教員も集約する
         let resolvedTeacherIds = [...teacherIds];
         if (isTT && !skipTT) {
+            const allJointClassIds = [classId, ...jointClassIds];
             const ttTeachers = this.assignments
-                .filter(a => a.classId === classId && a.subjectId === subjectId)
+                .filter(a => allJointClassIds.includes(a.classId) && a.subjectId === subjectId)
                 .map(a => a.teacherId);
             resolvedTeacherIds = [...new Set([...resolvedTeacherIds, ...ttTeachers])];
+        } else if (jointClassIds.length > 0 && !skipTT) {
+            // TTフラグがなくても合同展開する場合は全クラスの担当教員を集約
+            const allJointClassIds = [classId, ...jointClassIds];
+            const allTeachers = this.assignments
+                .filter(a => allJointClassIds.includes(a.classId) && a.subjectId === subjectId)
+                .map(a => a.teacherId);
+            resolvedTeacherIds = [...new Set([...resolvedTeacherIds, ...allTeachers])];
         }
 
         // 対象クラス（合同クラス含む）
@@ -973,10 +1023,10 @@ class DataStore {
             }
         }
 
-        // TT教員の空き確認（自動追加された教員が対象スロットに他の授業を持っていないか）
+        // TT教員・合同展開で自動追加された教員の空き確認
         const ttConflicts = [];
-        if (isTT) {
-            // teacherIds に含まれない、自動追加されたTT教員のみ確認
+        if (isTT || jointClassIds.length > 0) {
+            // teacherIds に含まれない、自動追加された教員のみ確認
             const addedTtTeachers = resolvedTeacherIds.filter(tid => !teacherIds.includes(tid));
             for (const ttTid of addedTtTeachers) {
                 const ttTimetable = this.getTeacherTimetable(ttTid);
