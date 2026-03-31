@@ -215,14 +215,31 @@ class TeacherTableRenderer {
             html += '<span class="tt-badge">TT</span>';
         }
 
-        // 授業内容
+        // 同一科目でグループ化して表示（合同授業は科目名を省略しクラスをまとめる）
+        const subjectGroups = {};
+        const subjectOrder = [];
         slots.forEach(slot => {
-            const linkedCount = this.store.getLinkedLessons(slot.classId, dayIndex, period).length;
+            const key = slot.subjectId || '__unknown__';
+            if (!subjectGroups[key]) {
+                subjectGroups[key] = { subjectName: slot.subjectName, slots: [] };
+                subjectOrder.push(key);
+            }
+            subjectGroups[key].slots.push(slot);
+        });
+
+        subjectOrder.forEach(subjectId => {
+            const group = subjectGroups[subjectId];
+            const groupSlots = group.slots;
+
+            // 最初のスロットから連動バッジ取得
+            const firstSlot = groupSlots[0];
+            const linkedCount = this.store.getLinkedLessons(firstSlot.classId, dayIndex, period).length;
             const linkIndicator = linkedCount > 1 ? `<span class="link-badge" title="連動: ${linkedCount}件">🔗</span>` : '';
 
+            // 教室名（全スロット共通として最初から取得）
             let roomNames = '';
-            if (slot.specialClassroomIds && slot.specialClassroomIds.length > 0) {
-                const names = slot.specialClassroomIds.map(rid => {
+            if (firstSlot.specialClassroomIds && firstSlot.specialClassroomIds.length > 0) {
+                const names = firstSlot.specialClassroomIds.map(rid => {
                     const r = this.store.getSpecialClassroom(rid);
                     return r ? (r.shortName || r.name) : '';
                 }).filter(n => n);
@@ -231,10 +248,20 @@ class TeacherTableRenderer {
                 }
             }
 
-            html += `<div class="cell-content-multi">
-                <span class="cell-subject">${linkIndicator}${slot.subjectName}</span>
-                <span class="cell-class">${slot.className} ${roomNames}</span>
-            </div>`;
+            if (groupSlots.length > 1) {
+                // 同一科目・複数クラス → 科目名1回 + クラスを「・」でまとめる
+                const classNames = groupSlots.map(s => s.className).join('・');
+                html += `<div class="cell-content-multi">
+                    <span class="cell-subject">${linkIndicator}${group.subjectName}</span>
+                    <span class="cell-class">${classNames} ${roomNames}</span>
+                </div>`;
+            } else {
+                // 単独科目はそのまま表示
+                html += `<div class="cell-content-multi">
+                    <span class="cell-subject">${linkIndicator}${group.subjectName}</span>
+                    <span class="cell-class">${firstSlot.className} ${roomNames}</span>
+                </div>`;
+            }
         });
 
         if (isJoint) {
