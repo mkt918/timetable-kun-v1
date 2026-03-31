@@ -112,7 +112,7 @@ class LessonManager {
                 const placedBadge = isPlaced ? ' <span style="color: #4CAF50; font-size: 0.8em;">[TT]</span>' : '';
 
                 return `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
                         <input type="checkbox" class="lesson-checkbox" 
                                data-class-id="${lesson.classId}"
                                data-subject-id="${lesson.subjectId}"
@@ -128,7 +128,7 @@ class LessonManager {
             }).join('');
 
             listContainer.innerHTML = `
-                <div style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;">
+                <div style="max-height: 300px; overflow-y: auto; margin-bottom: 10px; display:grid; grid-template-columns:1fr 1fr; gap:3px 6px;">
                     ${checkboxListHtml}
                 </div>
                 <div style="text-align: right; padding-top: 10px; border-top: 1px solid #ddd;">
@@ -278,7 +278,7 @@ class LessonManager {
                 const placedBadge = isPlaced ? ' <span style="color: #4CAF50; font-size: 0.8em;">[TT]</span>' : '';
 
                 return `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
                         <input type="checkbox" class="lesson-checkbox" 
                                data-class-id="${lesson.classId}"
                                data-subject-id="${lesson.subjectId}"
@@ -297,7 +297,7 @@ class LessonManager {
             const hasExisting = currentTeacherSlots.length > 0;
 
             listContainer.innerHTML = `
-                <div style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;">
+                <div style="max-height: 300px; overflow-y: auto; margin-bottom: 10px; display:grid; grid-template-columns:1fr 1fr; gap:3px 6px;">
                     ${checkboxListHtml}
                 </div>
                 <div style="display: flex; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid #ddd;">
@@ -912,7 +912,7 @@ class LessonManager {
                 const placedBadge = isPlaced ? ' <span style="color: #4CAF50; font-size: 0.8em;">[配置済み]</span>' : '';
 
                 checkboxListHtml += `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 8px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
                         <input type="checkbox" class="lesson-checkbox" 
                                data-teacher-id="${teacherId}"
                                data-subject-id="${lesson.subjectId}"
