@@ -17,18 +17,15 @@ class DivisionManager {
         panel.innerHTML = `
             <div style="display:flex; gap:20px; height:100%; overflow:hidden;">
                 <!-- 左: 分掌リスト -->
-                <div style="width:220px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;">
-                    <div style="font-size:0.82em; color:#6b7280;">
-                        分掌を選択すると右側で担当教員を設定できます。
-                    </div>
-                    <div id="division-list" style="display:flex; flex-direction:column; gap:5px; overflow-y:auto; flex:1;">
+                <div style="width:260px; flex-shrink:0; display:flex; flex-direction:column; gap:8px;">
+                    <div id="division-list" style="display:flex; flex-direction:column; gap:3px; overflow-y:auto; flex:1;">
                         ${this._renderDivisionList()}
                     </div>
                     <!-- 新規追加フォーム -->
-                    <div style="border-top:1px solid #e5e7eb; padding-top:10px; display:flex; gap:6px;">
+                    <div style="border-top:1px solid #e5e7eb; padding-top:8px; display:flex; gap:5px;">
                         <input type="text" id="division-new-name" placeholder="新しい分掌名"
-                            style="flex:1; font-size:0.85em; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px; min-width:0;">
-                        <button id="btn-division-add" class="btn btn-accent" style="font-size:0.82em; padding:5px 10px; flex-shrink:0;">追加</button>
+                            style="flex:1; font-size:0.84em; border:1px solid #e5e7eb; border-radius:5px; padding:4px 7px; min-width:0;">
+                        <button id="btn-division-add" class="btn btn-accent" style="font-size:0.82em; padding:4px 9px; flex-shrink:0;">追加</button>
                     </div>
                 </div>
 
@@ -55,36 +52,33 @@ class DivisionManager {
         }
         return this.store.divisions.map(div => {
             const isSelected = div.id === this._selectedDivId;
+            const count = this.store.getTeachersByDivision(div.id).length;
             return `
                 <div class="division-row" data-div-id="${escapeHtml(div.id)}"
                     style="border:1px solid ${isSelected ? '#93c5fd' : '#e5e7eb'};
                            background:${isSelected ? '#eff6ff' : '#fff'};
-                           border-radius:7px; padding:8px 10px; cursor:pointer;">
-                    <!-- 1行目: 分掌名 + 教員数バッジ -->
-                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-                        <div class="div-name-display" style="flex:1; font-size:0.88em; font-weight:600; color:#111827; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                            ${escapeHtml(div.name)}
-                        </div>
-                        <span style="font-size:0.72em; background:#e0e7ff; color:#4a6fa5; padding:1px 7px; border-radius:10px; flex-shrink:0;">
-                            ${this.store.getTeachersByDivision(div.id).length}名
-                        </span>
+                           border-radius:6px; padding:5px 8px; cursor:pointer;
+                           display:flex; align-items:center; gap:5px;">
+                    <!-- 分掌名（通常表示） -->
+                    <div class="div-name-display" style="flex:1; font-size:0.86em; font-weight:600; color:#111827; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        ${escapeHtml(div.name)}
                     </div>
-                    <!-- 2行目: 編集フォーム（非表示） -->
-                    <div class="div-edit-area" style="display:none; margin-bottom:5px;">
-                        <input class="div-name-input" type="text" value="${escapeHtml(div.name)}"
-                            style="width:100%; font-size:0.85em; border:1px solid #93c5fd; border-radius:4px; padding:3px 6px; box-sizing:border-box;">
-                    </div>
-                    <!-- 3行目: ボタン -->
-                    <div style="display:flex; gap:4px; justify-content:flex-end;">
-                        <button class="btn-div-edit" data-div-id="${escapeHtml(div.id)}"
-                            style="font-size:0.72em; padding:2px 8px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer;">
-                            編集
-                        </button>
-                        <button class="btn-div-delete" data-div-id="${escapeHtml(div.id)}"
-                            style="font-size:0.72em; padding:2px 8px; background:transparent; color:#ef4444; border:1px solid #fca5a5; border-radius:4px; cursor:pointer;">
-                            削除
-                        </button>
-                    </div>
+                    <!-- 編集中入力欄（非表示） -->
+                    <input class="div-name-input" type="text" value="${escapeHtml(div.name)}"
+                        style="display:none; flex:1; font-size:0.84em; border:1px solid #93c5fd; border-radius:4px; padding:2px 5px; min-width:0; box-sizing:border-box;">
+                    <!-- 教員数バッジ -->
+                    <span class="div-count-badge" style="font-size:0.7em; background:#e0e7ff; color:#4a6fa5; padding:1px 5px; border-radius:8px; flex-shrink:0; white-space:nowrap;">
+                        ${count}名
+                    </span>
+                    <!-- ボタン -->
+                    <button class="btn-div-edit" data-div-id="${escapeHtml(div.id)}"
+                        style="font-size:0.72em; padding:2px 6px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer; flex-shrink:0;">
+                        編集
+                    </button>
+                    <button class="btn-div-delete" data-div-id="${escapeHtml(div.id)}"
+                        style="font-size:0.72em; padding:2px 6px; background:transparent; color:#ef4444; border:1px solid #fca5a5; border-radius:4px; cursor:pointer; flex-shrink:0;">
+                        削除
+                    </button>
                 </div>
             `;
         }).join('');
@@ -211,16 +205,18 @@ class DivisionManager {
                 e.stopPropagation();
                 const row = btn.closest('.division-row');
                 const display = row.querySelector('.div-name-display');
-                const editArea = row.querySelector('.div-edit-area');
                 const input = row.querySelector('.div-name-input');
-                const isEditing = editArea.style.display !== 'none';
+                const badge = row.querySelector('.div-count-badge');
+                const isEditing = input.style.display !== 'none';
 
                 if (isEditing) {
                     const newName = input.value.trim();
                     if (!newName) { showToast('分掌名を入力してください', 'error'); return; }
                     this.store.updateDivision(btn.dataset.divId, newName);
                     display.textContent = newName;
-                    editArea.style.display = 'none';
+                    display.style.display = '';
+                    input.style.display = 'none';
+                    if (badge) badge.style.display = '';
                     btn.textContent = '編集';
                     // 右パネルのタイトルも更新
                     if (this._selectedDivId === btn.dataset.divId) {
@@ -228,7 +224,9 @@ class DivisionManager {
                     }
                     showToast('分掌名を変更しました', 'success');
                 } else {
-                    editArea.style.display = '';
+                    display.style.display = 'none';
+                    if (badge) badge.style.display = 'none';
+                    input.style.display = '';
                     input.focus();
                     input.select();
                     btn.textContent = '保存';
