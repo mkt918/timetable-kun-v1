@@ -504,7 +504,9 @@ class LessonManager {
      */
     _resolveTtTeacherIds(classId, subjectId, teacherIds) {
         const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
-        if (!cc || cc.lessonType !== 'tt') return teacherIds;
+        // isTT フラグ優先、後方互換で lessonType === 'tt' も認識
+        const isTT = cc && (cc.isTT === true || cc.lessonType === 'tt');
+        if (!isTT) return teacherIds;
         const ttTeachers = this.store.assignments
             .filter(a => a.classId === classId && a.subjectId === subjectId)
             .map(a => a.teacherId);

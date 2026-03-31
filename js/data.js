@@ -839,6 +839,9 @@ class DataStore {
         if (options.lessonType !== undefined) {
             item.lessonType = options.lessonType;
         }
+        if (options.isTT !== undefined) {
+            item.isTT = options.isTT;
+        }
         if (options.jointClassIds !== undefined) {
             // 双方向リンクを同期（jointClassIds の変更は必ず _syncJointGroup 経由で行う）
             this._syncJointGroup(item.classId, item.subjectId, options.jointClassIds);
@@ -934,6 +937,8 @@ class DataStore {
         const cc = this.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
         const consecutive = cc ? (cc.consecutivePeriods || 1) : 1;
         const lessonType  = cc ? (cc.lessonType || 'normal') : 'normal';
+        // isTT: 独立TTフラグ（lessonType === 'tt' との後方互換も維持）
+        const isTT = cc ? (cc.isTT === true || lessonType === 'tt') : false;
         // skipJoint=true のとき合同クラスへの自動展開をしない
         const jointClassIds = (!skipJoint && lessonType === 'joint' && cc?.jointClassIds?.length > 0)
             ? cc.jointClassIds : [];
@@ -941,7 +946,7 @@ class DataStore {
         // TT: skipTT=false のとき assignments から全担当教員を追加（重複除去）
         // skipTT=true の場合は呼び出し元で解決済みの teacherIds をそのまま使う
         let resolvedTeacherIds = [...teacherIds];
-        if (lessonType === 'tt' && !skipTT) {
+        if (isTT && !skipTT) {
             const ttTeachers = this.assignments
                 .filter(a => a.classId === classId && a.subjectId === subjectId)
                 .map(a => a.teacherId);
@@ -970,7 +975,7 @@ class DataStore {
 
         // TT教員の空き確認（自動追加された教員が対象スロットに他の授業を持っていないか）
         const ttConflicts = [];
-        if (lessonType === 'tt') {
+        if (isTT) {
             // teacherIds に含まれない、自動追加されたTT教員のみ確認
             const addedTtTeachers = resolvedTeacherIds.filter(tid => !teacherIds.includes(tid));
             for (const ttTid of addedTtTeachers) {

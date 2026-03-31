@@ -170,6 +170,10 @@ class ClassCurriculumManager {
                     // 授業形態オプション（デフォルト値を補完）
                     const consecutive = cc.consecutivePeriods || 1;
                     const lessonType = cc.lessonType || 'normal';
+                    // isTT: 独立TTフラグ（lessonType === 'tt' は後方互換として扱う）
+                    const isTT = cc.isTT === true || lessonType === 'tt';
+                    // 表示用 lessonType（tt は normal として扱い isTT チェックで表現）
+                    const displayLessonType = (lessonType === 'tt') ? 'normal' : lessonType;
                     const jointIds = cc.jointClassIds || [];
 
                     // 連続バッジ
@@ -177,14 +181,12 @@ class ClassCurriculumManager {
                         ? `<span style="background:#fef3c7; color:#92400e; font-size:0.72em; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;">${consecutive}連</span>`
                         : '';
 
-                    // 授業形態バッジ
-                    const typeBadgeMap = {
-                        tt:    'background:#f3e8ff; color:#6b21a8;',
-                        joint: 'background:#d1fae5; color:#065f46;'
-                    };
-                    const typeLabelMap = { normal: '', tt: 'TT', joint: '合同' };
-                    const typeBadge = lessonType !== 'normal'
-                        ? `<span style="${typeBadgeMap[lessonType]} font-size:0.72em; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;">${typeLabelMap[lessonType]}</span>`
+                    // バッジ：TT と 合同 は独立して表示
+                    const ttBadge = isTT
+                        ? `<span style="background:#f3e8ff; color:#6b21a8; font-size:0.72em; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;">TT</span>`
+                        : '';
+                    const jointBadge = displayLessonType === 'joint'
+                        ? `<span style="background:#d1fae5; color:#065f46; font-size:0.72em; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px;">合同</span>`
                         : '';
 
                     // 連続コマ選択肢
@@ -192,17 +194,16 @@ class ClassCurriculumManager {
                         `<option value="${n}" ${consecutive === n ? 'selected' : ''}>${n === 1 ? '連続なし' : `${n}コマ連続`}</option>`
                     ).join('');
 
-                    // 授業形態選択肢
+                    // 授業形態選択肢（TT は独立チェックボックスに分離）
                     const typeOptions = [
                         ['normal', '通常'],
-                        ['tt', 'TT（複数教員）'],
                         ['joint', '合同（複数クラス）']
                     ].map(([v, l]) =>
-                        `<option value="${v}" ${lessonType === v ? 'selected' : ''}>${l}</option>`
+                        `<option value="${v}" ${displayLessonType === v ? 'selected' : ''}>${l}</option>`
                     ).join('');
 
                     // 合同クラスチップ
-                    const jointChips = lessonType === 'joint'
+                    const jointChips = displayLessonType === 'joint'
                         ? `<div style="display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; align-items:center;">
                             <span style="font-size:0.72em; color:#9ca3af; flex-shrink:0;">合同:</span>
                             ${jointIds.length > 0
@@ -237,7 +238,7 @@ class ClassCurriculumManager {
                             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px;">
                                 <div style="flex:1; min-width:0;">
                                     <span style="font-weight:700; font-size:0.9em; color:#111827; line-height:1.35;">${escapeHtml(subName)}</span>
-                                    ${consBadge}${typeBadge}
+                                    ${consBadge}${ttBadge}${jointBadge}
                                 </div>
                                 <div style="display:flex; align-items:center; gap:2px; background:#f3f4f6; border-radius:8px; padding:3px 8px; flex-shrink:0;">
                                     <input type="number" class="cc-hours-input" data-id="${escapeHtml(cc.id)}"
@@ -255,13 +256,19 @@ class ClassCurriculumManager {
 
                             <!-- 授業形態設定 -->
                             <div style="display:flex; flex-direction:column; gap:4px; padding:6px 0; border-top:1px solid #f3f4f6; border-bottom:1px solid #f3f4f6;">
-                                <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
                                     <select class="cc-consecutive-select" data-id="${escapeHtml(cc.id)}" style="${selectStyle}">
                                         ${consOptions}
                                     </select>
                                     <select class="cc-lesson-type-select" data-id="${escapeHtml(cc.id)}" style="${selectStyle}">
                                         ${typeOptions}
                                     </select>
+                                    <label style="display:flex; align-items:center; gap:3px; font-size:0.75em; color:#6b21a8; cursor:pointer; user-select:none;">
+                                        <input type="checkbox" class="cc-tt-check" data-id="${escapeHtml(cc.id)}"
+                                            ${isTT ? 'checked' : ''}
+                                            style="accent-color:#6b21a8; width:13px; height:13px; cursor:pointer;">
+                                        TT
+                                    </label>
                                 </div>
                                 ${jointChips}
                             </div>
@@ -386,7 +393,7 @@ class ClassCurriculumManager {
             };
         });
 
-        // 授業形態変更
+        // 授業形態変更（normal / joint の切替）
         panel.querySelectorAll('.cc-lesson-type-select').forEach(sel => {
             sel.onchange = () => {
                 const newType = sel.value;
@@ -404,9 +411,21 @@ class ClassCurriculumManager {
                     const updated = this.store.classCurriculum.find(c => c.id === sel.dataset.id);
                     if (updated) this.openJointClassDialog(updated);
                 }
-                // 既に配置済みの授業には反映されない旨を案内
                 if (newType !== 'normal') {
                     showToast('設定を変更しました。既に配置済みの授業への反映は手動で再配置が必要です。', 'info');
+                }
+            };
+        });
+
+        // TTチェックボックス変更
+        panel.querySelectorAll('.cc-tt-check').forEach(cb => {
+            cb.onchange = () => {
+                const cc = this.store.classCurriculum.find(c => c.id === cb.dataset.id);
+                if (!cc) return;
+                this.store.updateClassCurriculumOptions(cb.dataset.id, { isTT: cb.checked });
+                this.renderCurriculumTable();
+                if (cb.checked) {
+                    showToast('TT（複数教員）を設定しました。既に配置済みの授業への反映は手動で再配置が必要です。', 'info');
                 }
             };
         });
@@ -745,18 +764,18 @@ class ClassCurriculumManager {
                         currentTeacherIds.add(tid);
                     }
 
-                    // 担当者数に応じて lessonType を自動切替
+                    // 担当者数に応じて isTT を自動切替
                     const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
                     if (cc) {
                         const teacherCount = currentTeacherIds.size;
-                        const currentType = cc.lessonType || 'normal';
-                        if (teacherCount >= 2 && currentType !== 'tt') {
-                            // 2人以上 → 自動的にTT設定
-                            this.store.updateClassCurriculumOptions(cc.id, { lessonType: 'tt' });
+                        const currentIsTT = cc.isTT === true || cc.lessonType === 'tt';
+                        if (teacherCount >= 2 && !currentIsTT) {
+                            // 2人以上 → 自動的にTT設定（lessonType は変えない）
+                            this.store.updateClassCurriculumOptions(cc.id, { isTT: true });
                             showToast(`担当が${teacherCount}名になりました。TT（複数教員）に自動設定しました`, 'info');
-                        } else if (teacherCount <= 1 && currentType === 'tt') {
-                            // 1人以下に戻ったら通常授業に戻す
-                            this.store.updateClassCurriculumOptions(cc.id, { lessonType: 'normal' });
+                        } else if (teacherCount <= 1 && currentIsTT) {
+                            // 1人以下に戻ったらTTを解除
+                            this.store.updateClassCurriculumOptions(cc.id, { isTT: false });
                         }
                     }
 
