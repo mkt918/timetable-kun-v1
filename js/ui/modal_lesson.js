@@ -976,28 +976,25 @@ class LessonManager {
                 const selectedRooms = Array.from(document.querySelectorAll('.room-checkbox:checked')).map(cb => cb.value);
                 const specialClassroomIds = selectedRooms.length > 0 ? selectedRooms : null;
 
-                // 選択された授業を登録
+                // 選択された授業を登録（合同・TT展開のため placeWithConstraints を使用）
                 let registeredCount = 0;
+
+                // 科目ごとにグループ化（同一科目の複数教員をまとめて処理）
+                const subjectTeacherMap = {};
                 selectedCheckboxes.forEach(cb => {
-                    const teacherId = cb.dataset.teacherId;
-                    const subjectId = cb.dataset.subjectId;
+                    const tid = cb.dataset.teacherId;
+                    const sid = cb.dataset.subjectId;
+                    if (!subjectTeacherMap[sid]) subjectTeacherMap[sid] = [];
+                    if (!subjectTeacherMap[sid].includes(tid)) subjectTeacherMap[sid].push(tid);
+                });
 
-                    // 既存の授業を確認
-                    const existingSlots = this.store.getSlot(classId, day, period);
-                    const existingSlot = existingSlots.find(slot => slot.subjectId === subjectId);
-
-                    if (existingSlot) {
-                        // 既存授業に教員を追加（TT）
-                        if (!existingSlot.teacherIds.includes(teacherId)) {
-                            const newTeacherIds = [...existingSlot.teacherIds, teacherId];
-                            this.store.setSlot(classId, day, period, subjectId, newTeacherIds, specialClassroomIds);
-                            registeredCount++;
-                        }
-                    } else {
-                        // 新規配置
-                        this.store.setSlot(classId, day, period, subjectId, [teacherId], specialClassroomIds);
-                        registeredCount++;
-                    }
+                Object.entries(subjectTeacherMap).forEach(([subjectId, teacherIds]) => {
+                    // TT教員を自動解決してから配置
+                    const resolvedTeacherIds = this._resolveTtTeacherIds(classId, subjectId, teacherIds);
+                    const result = this.store.placeWithConstraints(
+                        classId, day, period, subjectId, resolvedTeacherIds, specialClassroomIds
+                    );
+                    if (result.success || result.placed > 0) registeredCount++;
                 });
 
                 this.close();
