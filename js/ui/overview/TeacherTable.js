@@ -249,17 +249,18 @@ class TeacherTableRenderer {
             }
 
             if (groupSlots.length > 1) {
-                // 同一科目・複数クラス → 科目名1回 + クラスを「・」でまとめる
-                const classNames = groupSlots.map(s => s.className).join('・');
+                // 同一科目・複数クラス → 科目名1回 + クラスを圧縮表示（例: 3-1234）
+                const classLabel = formatJointClassNames(groupSlots.map(s => s.className));
                 html += `<div class="cell-content-multi">
                     <span class="cell-subject">${linkIndicator}${group.subjectName}</span>
-                    <span class="cell-class">${classNames} ${roomNames}</span>
+                    <span class="cell-class">${classLabel} ${roomNames}</span>
                 </div>`;
             } else {
-                // 単独科目はそのまま表示
+                // 単独科目はそのまま短縮表示（例: 3-1）
+                const classLabel = toShortClassName(firstSlot.className);
                 html += `<div class="cell-content-multi">
                     <span class="cell-subject">${linkIndicator}${group.subjectName}</span>
-                    <span class="cell-class">${firstSlot.className} ${roomNames}</span>
+                    <span class="cell-class">${classLabel} ${roomNames}</span>
                 </div>`;
             }
         });

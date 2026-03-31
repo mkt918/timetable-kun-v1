@@ -158,6 +158,65 @@ function deepClone(obj) {
 }
 
 // ========================================
+// クラス名表示変換
+// ========================================
+
+/**
+ * "N年M組" 形式のクラス名を "N-M" 形式に変換
+ * @param {string} name - クラス名（例: "1年3組"）
+ * @returns {string} 短縮形（例: "1-3"）。パターン外はそのまま返す
+ */
+function toShortClassName(name) {
+    const m = String(name).match(/^(\d+)年(\d+)組$/);
+    return m ? `${m[1]}-${m[2]}` : name;
+}
+
+/**
+ * 複数クラス名を短縮形にまとめて表示
+ * 同学年かつ同学年内のみの場合は "N-M1M2..." に圧縮。
+ * 異学年が混在する場合は "N-M1・N-M2" のように "・" で区切る。
+ * @param {string[]} classNames - クラス名の配列（例: ["1年1組", "1年2組"]）
+ * @returns {string} まとめた表示文字列（例: "1-12"）
+ */
+function formatJointClassNames(classNames) {
+    if (!classNames || classNames.length === 0) return '';
+    if (classNames.length === 1) return toShortClassName(classNames[0]);
+
+    // 全クラスを解析
+    const parsed = classNames.map(name => {
+        const m = String(name).match(/^(\d+)年(\d+)組$/);
+        return m ? { grade: m[1], num: m[2], original: name } : null;
+    });
+
+    // パース失敗があればフォールバック
+    if (parsed.some(p => p === null)) {
+        return classNames.map(toShortClassName).join('・');
+    }
+
+    // 学年でグループ化
+    const gradeGroups = {};
+    parsed.forEach(p => {
+        if (!gradeGroups[p.grade]) gradeGroups[p.grade] = [];
+        gradeGroups[p.grade].push(p.num);
+    });
+
+    const grades = Object.keys(gradeGroups).sort();
+
+    // 同学年のみ → "N-M1M2..." に圧縮
+    if (grades.length === 1) {
+        const g = grades[0];
+        const nums = gradeGroups[g].sort((a, b) => parseInt(a) - parseInt(b));
+        return `${g}-${nums.join('')}`;
+    }
+
+    // 異学年混在 → 学年ごとに圧縮して "・" 区切り
+    return grades.map(g => {
+        const nums = gradeGroups[g].sort((a, b) => parseInt(a) - parseInt(b));
+        return `${g}-${nums.join('')}`;
+    }).join('・');
+}
+
+// ========================================
 // 配列操作
 // ========================================
 
