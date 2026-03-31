@@ -1388,7 +1388,8 @@ class OverviewRenderer {
             });
 
             overlay.querySelector('#asgn-close-x').onclick = () => overlay.remove();
-            overlay.querySelector('#asgn-close-btn')?.onclick = () => overlay.remove();
+            const closeBtnEl = overlay.querySelector('#asgn-close-btn');
+            if (closeBtnEl) closeBtnEl.onclick = () => overlay.remove();
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
             if (activeTab === 'assignment') {
