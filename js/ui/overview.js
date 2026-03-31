@@ -1179,6 +1179,22 @@ class OverviewRenderer {
      * 教科タグで絞り込み → 科目タグ選択 → クラスタグでON/OFF
      * 教員の担当教科（categoryIds）を初期選択
      */
+    /**
+     * 担当教員数に応じて classCurriculum の isTT フラグを自動同期する
+     * 2人以上 → isTT: true、1人以下 → isTT: false
+     */
+    _syncIsTT(subjectId, classId) {
+        const cc = this.store.classCurriculum.find(c => c.classId === classId && c.subjectId === subjectId);
+        if (!cc) return;
+        const count = this.store.assignments.filter(a => a.classId === classId && a.subjectId === subjectId).length;
+        const currentIsTT = cc.isTT === true || cc.lessonType === 'tt';
+        if (count >= 2 && !currentIsTT) {
+            this.store.updateClassCurriculumOptions(cc.id, { isTT: true });
+        } else if (count <= 1 && currentIsTT) {
+            this.store.updateClassCurriculumOptions(cc.id, { isTT: false });
+        }
+    }
+
     openTeacherAssignmentModal(teacherId, initialTab = 'assignment') {
         const teacher = this.store.getTeacher(teacherId);
         if (!teacher) return;
@@ -1445,6 +1461,8 @@ class OverviewRenderer {
                                 this.store.addAssignment(teacherId, selectedSubjectId, classId, wh);
                                 showToast('担当を登録しました', 'success');
                             }
+                            // 担当者数に応じて isTT を自動同期
+                            this._syncIsTT(selectedSubjectId, classId);
                             subjectArea.innerHTML = renderSubjectTags();
                             classArea.innerHTML   = renderClassPanel();
                             attachSubjectEvents();

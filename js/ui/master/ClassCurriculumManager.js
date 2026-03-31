@@ -109,6 +109,18 @@ class ClassCurriculumManager {
         const cls = CLASSES.find(c => c.id === this.selectedClassId);
         const className = cls ? cls.name : this.selectedClassId;
         const curriculum = this.store.getClassCurriculum(this.selectedClassId);
+
+        // 担当教員数に応じて isTT を自動補正（表示前に整合性を保つ）
+        curriculum.forEach(cc => {
+            const count = this.store.assignments.filter(a => a.classId === cc.classId && a.subjectId === cc.subjectId).length;
+            const currentIsTT = cc.isTT === true || cc.lessonType === 'tt';
+            if (count >= 2 && !currentIsTT) {
+                this.store.updateClassCurriculumOptions(cc.id, { isTT: true });
+            } else if (count <= 1 && currentIsTT) {
+                this.store.updateClassCurriculumOptions(cc.id, { isTT: false });
+            }
+        });
+
         const totalHours = curriculum.reduce((s, cc) => s + (cc.weeklyHours || 0), 0);
         const assignedCount = curriculum.filter(cc =>
             this.store.assignments.some(a => a.classId === this.selectedClassId && a.subjectId === cc.subjectId)
