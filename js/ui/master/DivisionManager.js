@@ -7,6 +7,7 @@ class DivisionManager {
         this.store = store;
         this.ui = ui;
         this.masterData = masterData;
+        this._selectedDivId = null;
     }
 
     render() {
@@ -16,18 +17,18 @@ class DivisionManager {
         panel.innerHTML = `
             <div style="display:flex; gap:20px; height:100%; overflow:hidden;">
                 <!-- 左: 分掌リスト -->
-                <div style="width:260px; flex-shrink:0; display:flex; flex-direction:column; gap:12px;">
+                <div style="width:220px; flex-shrink:0; display:flex; flex-direction:column; gap:10px;">
                     <div style="font-size:0.82em; color:#6b7280;">
-                        分掌を登録・編集できます。選択すると右側で担当教員を設定できます。
+                        分掌を選択すると右側で担当教員を設定できます。
                     </div>
-                    <div id="division-list" style="display:flex; flex-direction:column; gap:6px; overflow-y:auto; flex:1;">
+                    <div id="division-list" style="display:flex; flex-direction:column; gap:5px; overflow-y:auto; flex:1;">
                         ${this._renderDivisionList()}
                     </div>
                     <!-- 新規追加フォーム -->
                     <div style="border-top:1px solid #e5e7eb; padding-top:10px; display:flex; gap:6px;">
                         <input type="text" id="division-new-name" placeholder="新しい分掌名"
-                            style="flex:1; font-size:0.85em; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px;">
-                        <button id="btn-division-add" class="btn btn-accent" style="font-size:0.82em; padding:5px 10px;">追加</button>
+                            style="flex:1; font-size:0.85em; border:1px solid #e5e7eb; border-radius:5px; padding:5px 8px; min-width:0;">
+                        <button id="btn-division-add" class="btn btn-accent" style="font-size:0.82em; padding:5px 10px; flex-shrink:0;">追加</button>
                     </div>
                 </div>
 
@@ -41,38 +42,63 @@ class DivisionManager {
         `;
 
         this._attachEvents(panel);
+
+        // 前回選択した分掌を復元
+        if (this._selectedDivId && this.store.divisions.find(d => d.id === this._selectedDivId)) {
+            this._selectDiv(this._selectedDivId);
+        }
     }
 
     _renderDivisionList() {
         if (this.store.divisions.length === 0) {
             return '<p style="color:#aaa; font-size:0.85em;">分掌が登録されていません</p>';
         }
-        return this.store.divisions.map(div => `
-            <div class="division-row" data-div-id="${escapeHtml(div.id)}"
-                style="display:flex; align-items:center; gap:6px; padding:7px 10px; border:1px solid #e5e7eb;
-                       border-radius:7px; background:#fff; cursor:pointer;">
-                <!-- 分掌名（クリックで編集） -->
-                <div class="div-name-display" style="flex:1; font-size:0.88em; font-weight:500; color:#111827;">
-                    ${escapeHtml(div.name)}
+        return this.store.divisions.map(div => {
+            const isSelected = div.id === this._selectedDivId;
+            return `
+                <div class="division-row" data-div-id="${escapeHtml(div.id)}"
+                    style="border:1px solid ${isSelected ? '#93c5fd' : '#e5e7eb'};
+                           background:${isSelected ? '#eff6ff' : '#fff'};
+                           border-radius:7px; padding:8px 10px; cursor:pointer;">
+                    <!-- 1行目: 分掌名 + 教員数バッジ -->
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
+                        <div class="div-name-display" style="flex:1; font-size:0.88em; font-weight:600; color:#111827; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            ${escapeHtml(div.name)}
+                        </div>
+                        <span style="font-size:0.72em; background:#e0e7ff; color:#4a6fa5; padding:1px 7px; border-radius:10px; flex-shrink:0;">
+                            ${this.store.getTeachersByDivision(div.id).length}名
+                        </span>
+                    </div>
+                    <!-- 2行目: 編集フォーム（非表示） -->
+                    <div class="div-edit-area" style="display:none; margin-bottom:5px;">
+                        <input class="div-name-input" type="text" value="${escapeHtml(div.name)}"
+                            style="width:100%; font-size:0.85em; border:1px solid #93c5fd; border-radius:4px; padding:3px 6px; box-sizing:border-box;">
+                    </div>
+                    <!-- 3行目: ボタン -->
+                    <div style="display:flex; gap:4px; justify-content:flex-end;">
+                        <button class="btn-div-edit" data-div-id="${escapeHtml(div.id)}"
+                            style="font-size:0.72em; padding:2px 8px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer;">
+                            編集
+                        </button>
+                        <button class="btn-div-delete" data-div-id="${escapeHtml(div.id)}"
+                            style="font-size:0.72em; padding:2px 8px; background:transparent; color:#ef4444; border:1px solid #fca5a5; border-radius:4px; cursor:pointer;">
+                            削除
+                        </button>
+                    </div>
                 </div>
-                <input class="div-name-input" type="text" value="${escapeHtml(div.name)}"
-                    style="flex:1; font-size:0.85em; border:1px solid #93c5fd; border-radius:4px; padding:2px 6px; display:none;">
-                <!-- 教員数バッジ -->
-                <span style="font-size:0.72em; background:#e0e7ff; color:#4a6fa5; padding:1px 7px; border-radius:10px; flex-shrink:0;">
-                    ${this.store.getTeachersByDivision(div.id).length}名
-                </span>
-                <!-- 編集ボタン -->
-                <button class="btn-div-edit" data-div-id="${escapeHtml(div.id)}"
-                    style="font-size:0.75em; padding:2px 7px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; border-radius:4px; cursor:pointer; flex-shrink:0;">
-                    編集
-                </button>
-                <!-- 削除ボタン -->
-                <button class="btn-div-delete" data-div-id="${escapeHtml(div.id)}"
-                    style="font-size:0.75em; padding:2px 7px; background:transparent; color:#ef4444; border:1px solid #fca5a5; border-radius:4px; cursor:pointer; flex-shrink:0;">
-                    削除
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
+    }
+
+    _selectDiv(divId) {
+        this._selectedDivId = divId;
+        // ハイライト更新
+        document.querySelectorAll('.division-row').forEach(r => {
+            const selected = r.dataset.divId === divId;
+            r.style.background = selected ? '#eff6ff' : '#fff';
+            r.style.borderColor = selected ? '#93c5fd' : '#e5e7eb';
+        });
+        this._renderTeacherPanel(divId);
     }
 
     _renderTeacherPanel(divId) {
@@ -91,33 +117,32 @@ class DivisionManager {
                 .filter(n => n).join('・');
             return `
                 <div class="div-teacher-row" data-teacher-id="${escapeHtml(t.id)}" data-div-id="${escapeHtml(divId)}"
-                    style="display:flex; align-items:center; gap:10px; padding:8px 12px; margin:2px 0;
+                    style="display:flex; align-items:center; gap:8px; padding:7px 10px;
                            border-radius:7px; cursor:pointer;
                            border:1px solid ${isAssigned ? '#bfdbfe' : '#e5e7eb'};
                            background:${isAssigned ? '#eff6ff' : '#fff'};">
                     <input type="checkbox" ${isAssigned ? 'checked' : ''}
-                        style="accent-color:#4a6fa5; width:16px; height:16px; cursor:pointer; flex-shrink:0;">
-                    <div style="flex:1;">
-                        <div style="font-size:0.88em; font-weight:${isAssigned ? '600' : '400'}; color:${isAssigned ? '#1d4ed8' : '#374151'};">
+                        style="accent-color:#4a6fa5; width:15px; height:15px; cursor:pointer; flex-shrink:0;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:0.85em; font-weight:${isAssigned ? '600' : '400'}; color:${isAssigned ? '#1d4ed8' : '#374151'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                             ${escapeHtml(t.name)}
                         </div>
-                        ${catNames ? `<div style="font-size:0.75em; color:#9ca3af;">${escapeHtml(catNames)}</div>` : ''}
+                        ${catNames ? `<div style="font-size:0.72em; color:#9ca3af;">${escapeHtml(catNames)}</div>` : ''}
                     </div>
                 </div>
             `;
         }).join('') || '<p style="color:#aaa; font-size:0.85em;">教員が登録されていません</p>';
 
         panel.innerHTML = `
-            <div style="font-weight:600; font-size:0.92em; color:#111827; margin-bottom:10px; padding-bottom:6px; border-bottom:2px solid #e0e7ff;">
+            <div style="font-weight:600; font-size:0.92em; color:#111827; margin-bottom:8px; padding-bottom:6px; border-bottom:2px solid #e0e7ff;">
                 「${escapeHtml(div.name)}」の担当教員
             </div>
-            <div style="font-size:0.8em; color:#6b7280; margin-bottom:8px;">クリックで担当ON/OFFを切り替えます</div>
-            <div style="max-height:calc(100% - 80px); overflow-y:auto;">
+            <div style="font-size:0.8em; color:#6b7280; margin-bottom:10px;">クリックで担当ON/OFFを切り替えます</div>
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">
                 ${teacherItems}
             </div>
         `;
 
-        // 教員クリックイベント
         panel.querySelectorAll('.div-teacher-row').forEach(row => {
             row.onclick = (e) => {
                 if (e.target.tagName === 'INPUT') return;
@@ -125,9 +150,8 @@ class DivisionManager {
                 cb.checked = !cb.checked;
                 this._toggleTeacherDivision(row.dataset.teacherId, divId, cb.checked);
             };
-            const cb = row.querySelector('input[type=checkbox]');
-            cb.onchange = () => {
-                this._toggleTeacherDivision(row.dataset.teacherId, divId, cb.checked);
+            row.querySelector('input[type=checkbox]').onchange = (e) => {
+                this._toggleTeacherDivision(row.dataset.teacherId, divId, e.target.checked);
             };
         });
     }
@@ -136,26 +160,22 @@ class DivisionManager {
         const teacher = this.store.getTeacher(teacherId);
         if (!teacher) return;
         const current = teacher.divisions || [];
-        let updated;
-        if (assign) {
-            updated = current.includes(divId) ? current : [...current, divId];
-        } else {
-            updated = current.filter(d => d !== divId);
-        }
+        const updated = assign
+            ? (current.includes(divId) ? current : [...current, divId])
+            : current.filter(d => d !== divId);
         this.store.setTeacherDivisions(teacherId, updated);
-        // 教員パネルを再描画
         this._renderTeacherPanel(divId);
-        // 左リストのバッジ更新
+        // バッジだけ更新
         const list = document.getElementById('division-list');
-        if (list) list.innerHTML = this._renderDivisionList();
-        this._reattachListEvents(document.getElementById('master-divisions'));
+        if (list) {
+            list.innerHTML = this._renderDivisionList();
+            this._reattachListEvents(document.getElementById('master-divisions'));
+        }
     }
 
     _attachEvents(panel) {
-        // 分掌行クリック → 右パネルに教員一覧
         this._reattachListEvents(panel);
 
-        // 追加ボタン
         panel.querySelector('#btn-division-add').onclick = () => {
             const input = panel.querySelector('#division-new-name');
             const name = input.value.trim();
@@ -169,7 +189,6 @@ class DivisionManager {
             showToast(`「${name}」を追加しました`, 'success');
         };
 
-        // Enterキーで追加
         panel.querySelector('#division-new-name').onkeydown = (e) => {
             if (e.key === 'Enter') panel.querySelector('#btn-division-add').click();
         };
@@ -178,46 +197,38 @@ class DivisionManager {
     _reattachListEvents(panel) {
         if (!panel) return;
 
-        // 分掌行クリック
         panel.querySelectorAll('.division-row').forEach(row => {
             row.onclick = (e) => {
                 if (e.target.classList.contains('btn-div-edit') ||
                     e.target.classList.contains('btn-div-delete') ||
-                    e.target.classList.contains('div-name-input')) return;
-                // 選択ハイライト
-                panel.querySelectorAll('.division-row').forEach(r => {
-                    r.style.background = '#fff';
-                    r.style.borderColor = '#e5e7eb';
-                });
-                row.style.background = '#eff6ff';
-                row.style.borderColor = '#93c5fd';
-                this._renderTeacherPanel(row.dataset.divId);
+                    e.target.tagName === 'INPUT') return;
+                this._selectDiv(row.dataset.divId);
             };
         });
 
-        // 編集ボタン
         panel.querySelectorAll('.btn-div-edit').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
                 const row = btn.closest('.division-row');
                 const display = row.querySelector('.div-name-display');
+                const editArea = row.querySelector('.div-edit-area');
                 const input = row.querySelector('.div-name-input');
-                const isEditing = input.style.display !== 'none';
+                const isEditing = editArea.style.display !== 'none';
 
                 if (isEditing) {
-                    // 保存
                     const newName = input.value.trim();
                     if (!newName) { showToast('分掌名を入力してください', 'error'); return; }
                     this.store.updateDivision(btn.dataset.divId, newName);
                     display.textContent = newName;
-                    display.style.display = '';
-                    input.style.display = 'none';
+                    editArea.style.display = 'none';
                     btn.textContent = '編集';
+                    // 右パネルのタイトルも更新
+                    if (this._selectedDivId === btn.dataset.divId) {
+                        this._renderTeacherPanel(btn.dataset.divId);
+                    }
                     showToast('分掌名を変更しました', 'success');
                 } else {
-                    // 編集モードに
-                    display.style.display = 'none';
-                    input.style.display = '';
+                    editArea.style.display = '';
                     input.focus();
                     input.select();
                     btn.textContent = '保存';
@@ -225,7 +236,6 @@ class DivisionManager {
             };
         });
 
-        // 削除ボタン
         panel.querySelectorAll('.btn-div-delete').forEach(btn => {
             btn.onclick = (e) => {
                 e.stopPropagation();
@@ -236,6 +246,7 @@ class DivisionManager {
                     ? `「${div.name}」を削除しますか？（${memberCount}名の割当が解除されます）`
                     : `「${div.name}」を削除しますか？`;
                 if (!confirm(msg)) return;
+                if (this._selectedDivId === btn.dataset.divId) this._selectedDivId = null;
                 this.store.deleteDivision(btn.dataset.divId);
                 this.render();
                 showToast('削除しました', 'success');

@@ -125,18 +125,18 @@
             </div>
             <div class="modal-body master-body">
                 <div class="master-tabs">
-                    <button class="master-tab active" data-tab="teachers">👤 教員</button>
-                    <button class="master-tab" data-tab="subjects">📚 教科・科目</button>
+                    <button class="master-tab active" data-tab="subjects">📚 教科・科目</button>
                     <button class="master-tab" data-tab="rooms">🏫 特別教室</button>
+                    <button class="master-tab" data-tab="teachers">👤 教員</button>
+                    <button class="master-tab" data-tab="homeroom">🏠 担任</button>
+                    <button class="master-tab" data-tab="divisions">🗂️ 分掌</button>
                     <button class="master-tab" data-tab="meetings">📅 会議・業務</button>
-                    <button class="master-tab" data-tab="curriculum">📋 クラス別設定</button>
-                    <button class="master-tab" data-tab="homeroom">🏠 担任設定</button>
-                    <button class="master-tab" data-tab="divisions">🗂️ 分掌設定</button>
-                    <button class="master-tab" data-tab="settings">⚙️ 設定</button>
+                    <button class="master-tab" data-tab="curriculum">📋 開設授業</button>
+                    <button class="master-tab" data-tab="settings">⚙️ 学校基本設定</button>
                 </div>
                 <div class="master-content">
                     <!-- 教員タブ -->
-                    <div id="master-teachers" class="master-pane active">
+                    <div id="master-teachers" class="master-pane hidden">
                         <div class="master-toolbar">
                             <h4>教員一覧</h4>
                             <div style="display: flex; gap: 8px;">
@@ -178,6 +178,20 @@
                                         <label>参加教員を教科で絞り込み（複数可）</label>
                                         <div class="tag-container" id="meeting-category-filter-tags">
                                             <!-- 教科フィルタータグが動的に生成される -->
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>参加教員を学年で絞り込み（複数可）</label>
+                                        <div class="tag-container" id="meeting-grade-filter-tags">
+                                            <!-- 学年フィルタータグが動的に生成される -->
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>参加教員を分掌で絞り込み（複数可）</label>
+                                        <div class="tag-container" id="meeting-division-filter-tags">
+                                            <!-- 分掌フィルタータグが動的に生成される -->
                                         </div>
                                     </div>
 
@@ -227,7 +241,7 @@
                         </div>
                     </div>
                     <!-- 教科・科目タブ -->
-                    <div id="master-subjects" class="master-pane hidden">
+                    <div id="master-subjects" class="master-pane active">
                         <div class="subject-layout">
                             <!-- 左: 教科カテゴリ -->
                             <div class="category-panel">

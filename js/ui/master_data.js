@@ -25,8 +25,8 @@ class MasterDataManager {
 
     openModal() {
         const modal = document.getElementById('modal-master-data');
-        this.renderTeachers();
-        this.switchTab('teachers');
+        this.renderSubjects();
+        this.switchTab('subjects');
 
         modal.querySelectorAll('.master-tab').forEach(tab => {
             tab.onclick = () => this.switchTab(tab.dataset.tab);
@@ -2282,10 +2282,14 @@ class MasterDataManager {
         if (!this.meetingState) {
             this.meetingState = {
                 filterCategoryIds: [],
+                filterGrades: [],
+                filterDivisionIds: [],
                 teacherIds: [],
                 schedule: []  // [{dayIndex, period}, ...]
             };
         }
+        if (!this.meetingState.filterGrades) this.meetingState.filterGrades = [];
+        if (!this.meetingState.filterDivisionIds) this.meetingState.filterDivisionIds = [];
 
         // 教科フィルタータグ
         const categoryContainer = document.getElementById('meeting-category-filter-tags');
@@ -2295,6 +2299,47 @@ class MasterDataManager {
                      data-id="${c.id}"
                      onclick="ui.masterData.handleMeetingCategoryFilter('${c.id}')">
                     ${c.name}
+                </div>
+            `).join('');
+        }
+
+        // 学年フィルタータグ（担任設定から学年を抽出）
+        const gradeContainer = document.getElementById('meeting-grade-filter-tags');
+        if (gradeContainer) {
+            // 担任設定がある学年を取得
+            const gradesWithHomeroom = [...new Set(
+                (this.store.homeroom || [])
+                    .filter(h => h.teacherId)
+                    .map(h => {
+                        const cls = CLASSES.find(c => c.id === h.classId);
+                        return cls ? cls.grade : null;
+                    })
+                    .filter(g => g !== null)
+            )].sort();
+            // 担任設定がなければ全学年を表示
+            const allGrades = [...new Set(CLASSES.map(c => c.grade))].sort();
+            const grades = gradesWithHomeroom.length > 0 ? gradesWithHomeroom : allGrades;
+            const gradeLabel = g => {
+                const map = { 1: '第1学年', 2: '第2学年', 3: '第3学年', 4: '第4学年', 5: '第5学年', 6: '第6学年' };
+                return map[g] || `${g}年`;
+            };
+            gradeContainer.innerHTML = grades.map(g => `
+                <div class="tag-item ${this.meetingState.filterGrades.includes(g) ? 'selected' : ''}"
+                     data-grade="${g}"
+                     onclick="ui.masterData.handleMeetingGradeFilter(${g})">
+                    ${gradeLabel(g)}
+                </div>
+            `).join('');
+        }
+
+        // 分掌フィルタータグ
+        const divisionContainer = document.getElementById('meeting-division-filter-tags');
+        if (divisionContainer) {
+            divisionContainer.innerHTML = (this.store.divisions || []).map(d => `
+                <div class="tag-item ${this.meetingState.filterDivisionIds.includes(d.id) ? 'selected' : ''}"
+                     data-id="${d.id}"
+                     onclick="ui.masterData.handleMeetingDivisionFilter('${d.id}')">
+                    ${escapeHtml(d.name)}
                 </div>
             `).join('');
         }
@@ -2348,6 +2393,29 @@ class MasterDataManager {
             );
         }
 
+        // 学年で絞り込み
+        if (this.meetingState.filterGrades && this.meetingState.filterGrades.length > 0) {
+            const teacherIdsInGrades = new Set(
+                (this.store.homeroom || [])
+                    .filter(h => {
+                        const cls = CLASSES.find(c => c.id === h.classId);
+                        return cls && this.meetingState.filterGrades.includes(cls.grade);
+                    })
+                    .map(h => h.teacherId)
+                    .filter(id => id)
+            );
+            teachers = teachers.filter(t => teacherIdsInGrades.has(t.id));
+        }
+
+        // 分掌で絞り込み
+        if (this.meetingState.filterDivisionIds && this.meetingState.filterDivisionIds.length > 0) {
+            teachers = teachers.filter(t =>
+                t.divisions && t.divisions.some(did =>
+                    this.meetingState.filterDivisionIds.includes(did)
+                )
+            );
+        }
+
         // 全て選択済みかチェック
         const allSelected = teachers.every(t => this.meetingState.teacherIds.includes(t.id));
 
@@ -2380,6 +2448,8 @@ class MasterDataManager {
         if (nameInput) nameInput.value = '';
 
         this.meetingState.filterCategoryIds = [];
+        this.meetingState.filterGrades = [];
+        this.meetingState.filterDivisionIds = [];
         this.meetingState.teacherIds = [];
         this.meetingState.schedule = [];
 
@@ -2405,6 +2475,26 @@ class MasterDataManager {
         this.renderMeetingForm();
     }
 
+    handleMeetingGradeFilter(grade) {
+        const idx = this.meetingState.filterGrades.indexOf(grade);
+        if (idx >= 0) {
+            this.meetingState.filterGrades.splice(idx, 1);
+        } else {
+            this.meetingState.filterGrades.push(grade);
+        }
+        this.renderMeetingForm();
+    }
+
+    handleMeetingDivisionFilter(divisionId) {
+        const idx = this.meetingState.filterDivisionIds.indexOf(divisionId);
+        if (idx >= 0) {
+            this.meetingState.filterDivisionIds.splice(idx, 1);
+        } else {
+            this.meetingState.filterDivisionIds.push(divisionId);
+        }
+        this.renderMeetingForm();
+    }
+
     renderMeetingTeacherTags() {
         const container = document.getElementById('meeting-teacher-tags');
         if (!container) return;
@@ -2416,6 +2506,29 @@ class MasterDataManager {
             teachers = teachers.filter(t =>
                 t.categoryIds && t.categoryIds.some(cid =>
                     this.meetingState.filterCategoryIds.includes(cid)
+                )
+            );
+        }
+
+        // 学年で絞り込み（担任設定から判断）
+        if (this.meetingState.filterGrades && this.meetingState.filterGrades.length > 0) {
+            const teacherIdsInGrades = new Set(
+                (this.store.homeroom || [])
+                    .filter(h => {
+                        const cls = CLASSES.find(c => c.id === h.classId);
+                        return cls && this.meetingState.filterGrades.includes(cls.grade);
+                    })
+                    .map(h => h.teacherId)
+                    .filter(id => id)
+            );
+            teachers = teachers.filter(t => teacherIdsInGrades.has(t.id));
+        }
+
+        // 分掌で絞り込み
+        if (this.meetingState.filterDivisionIds && this.meetingState.filterDivisionIds.length > 0) {
+            teachers = teachers.filter(t =>
+                t.divisions && t.divisions.some(did =>
+                    this.meetingState.filterDivisionIds.includes(did)
                 )
             );
         }
