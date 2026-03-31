@@ -760,6 +760,7 @@ class OverviewRenderer {
 
                 classes.forEach((cls, index) => {
                     const isSeparator = index < classes.length - 1 && cls.grade !== classes[index + 1].grade;
+                    const separatorBorder = isSeparator ? 'border-right: 3px solid #666;' : '';
                     const separatorStyle = isSeparator ? 'style="border-right: 3px solid #666;"' : '';
 
                     const slots = this.store.getSlot(cls.id, dayIndex, period);
@@ -785,8 +786,23 @@ class OverviewRenderer {
 
                         const multiWarningClass = visibleSlots.length > 1 ? 'cell-multi-warning' : '';
 
+                        // 教科に基づく背景色を取得（最初のスロットの教科を使用）
+                        let categoryColor = '';
+                        if (visibleSlots[0] && visibleSlots[0].subjectId) {
+                            const subject = this.store.getSubject(visibleSlots[0].subjectId);
+                            if (subject && subject.categoryId) {
+                                const category = this.store.getCategory(subject.categoryId);
+                                const categoryIndex = this.store.categories.findIndex(c => c.id === subject.categoryId);
+                                if (categoryIndex >= 0) {
+                                    const colorIndex = categoryIndex % 20;
+                                    const color = category?.color || `var(--category-color-${colorIndex})`;
+                                    categoryColor = `background-color: ${color};`;
+                                }
+                            }
+                        }
+
                         html += `<td class="has-lesson ${ttClass} ${multiWarningClass}"
-                                     ${separatorStyle}
+                                     style="${categoryColor}${separatorBorder}"
                                      data-class-id="${cls.id}"
                                      data-day="${dayIndex}"
                                      data-period="${period}">`;
