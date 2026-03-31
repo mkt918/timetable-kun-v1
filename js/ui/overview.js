@@ -232,8 +232,7 @@ class OverviewRenderer {
             }
 
             html += `<th class="${separatorClass}" style="cursor: default;">
-                <span style="cursor: pointer; text-decoration: underline dotted;" onclick="ui.openTeacherAssignmentModal('${escapeHtml(teacher.id)}')" title="クリックして担当授業を設定">${escapeHtml(teacher.name)}</span>
-                <span style="cursor: pointer; font-size:0.8em; margin-left:4px;" onclick="ui.openUnavailableSettingsModal('${escapeHtml(teacher.id)}')" title="勤務不可設定">⚙️</span>
+                <span style="cursor: pointer; text-decoration: underline dotted;" onclick="ui.openTeacherAssignmentModal('${escapeHtml(teacher.id)}')" title="クリックして設定">${escapeHtml(teacher.name)}</span>
                 <div style="font-size: 0.8em; font-weight: normal; color: #666;">${lessonDisplay}</div>
             </th>`;
         });
@@ -1180,7 +1179,7 @@ class OverviewRenderer {
      * 教科タグで絞り込み → 科目タグ選択 → クラスタグでON/OFF
      * 教員の担当教科（categoryIds）を初期選択
      */
-    openTeacherAssignmentModal(teacherId) {
+    openTeacherAssignmentModal(teacherId, initialTab = 'assignment') {
         const teacher = this.store.getTeacher(teacherId);
         if (!teacher) return;
 
@@ -1189,18 +1188,35 @@ class OverviewRenderer {
         const overlay = document.createElement('div');
         overlay.className = 'dialog-overlay asgn-modal-overlay';
 
-        // 教科ごとの色
+        let activeTab = initialTab; // 'assignment' | 'unavailable'
+
+        // ── タブ共通ヘッダー ──
+        const renderTabs = () => `
+            <div style="display:flex; gap:0; border-bottom:2px solid #e5e7eb; margin-bottom:16px;">
+                <button class="asgn-tab-btn" data-tab="assignment"
+                    style="padding:8px 20px; font-size:0.9em; font-weight:600; border:none; background:none; cursor:pointer; border-bottom:${activeTab === 'assignment' ? '2px solid #4a6fa5; color:#4a6fa5; margin-bottom:-2px;' : 'none; color:#6b7280;'}">
+                    担当授業
+                </button>
+                <button class="asgn-tab-btn" data-tab="unavailable"
+                    style="padding:8px 20px; font-size:0.9em; font-weight:600; border:none; background:none; cursor:pointer; border-bottom:${activeTab === 'unavailable' ? '2px solid #4a6fa5; color:#4a6fa5; margin-bottom:-2px;' : 'none; color:#6b7280;'}">
+                    勤務不可時間
+                </button>
+            </div>
+        `;
+
+        // ─────────────────────────────────────
+        // タブ1: 担当授業
+        // ─────────────────────────────────────
+
         const catColorMap = {};
         this.store.categories.forEach((cat, i) => {
             catColorMap[cat.id] = cat.color || `hsl(${(i * 47) % 360}, 60%, 88%)`;
         });
 
-        // 教員の担当教科の最初のIDを初期選択
         const teacherCatIds = teacher.categoryIds || [];
         let selectedCategoryId = teacherCatIds.length > 0 ? teacherCatIds[0] : (this.store.categories[0]?.id || null);
         let selectedSubjectId = null;
 
-        // ── 教科タグ ──
         const renderCategoryTags = () => {
             return this.store.categories.map(cat => {
                 const isSelected = cat.id === selectedCategoryId;
@@ -1211,15 +1227,13 @@ class OverviewRenderer {
                 return `
                     <span class="asgn-cat-tag" data-cat-id="${escapeHtml(cat.id)}"
                           style="padding:4px 12px; border-radius:20px; cursor:pointer; font-size:0.88em;
-                                 user-select:none; font-weight:${fw};
-                                 background:${bg}; border:${border};">
+                                 user-select:none; font-weight:${fw}; background:${bg}; border:${border};">
                         ${escapeHtml(cat.name)}
                     </span>
                 `;
             }).join('');
         };
 
-        // ── 科目タグ（選択教科でフィルタ） ──
         const renderSubjectTags = () => {
             if (!selectedCategoryId) return '<p style="color:#aaa; font-size:0.9em;">教科を選択してください</p>';
             const subjects = this.store.subjects.filter(s => s.categoryId === selectedCategoryId && !s.isHidden);
@@ -1242,25 +1256,20 @@ class OverviewRenderer {
             }).join('');
         };
 
-        // ── クラスタグ（科目の学年・クラス属性でフィルタ） ──
         const renderClassPanel = () => {
             if (!selectedSubjectId) return '<p style="color:#aaa; font-size:0.9em;">← 科目を選択してください</p>';
             const sub = this.store.getSubject(selectedSubjectId);
             if (!sub) return '';
-
-            // 科目の学年・クラス属性で表示クラスを絞り込む
             let filteredClasses = CLASSES;
             if (sub.targetClass) {
                 filteredClasses = CLASSES.filter(c => c.id === sub.targetClass);
             } else if (sub.grade) {
                 filteredClasses = CLASSES.filter(c => String(c.grade) === String(sub.grade));
             }
-
             const assignedClassIds = new Set(
                 this.store.assignments.filter(a => a.teacherId === teacherId && a.subjectId === selectedSubjectId).map(a => a.classId)
             );
             const filterNote = sub.targetClass ? '（クラス指定）' : sub.grade ? `（${sub.grade}年生対象）` : '';
-            // 学年ごとにグループ化してタグを生成
             const gradeGroups = {};
             filteredClasses.forEach(c => {
                 const g = c.grade || 0;
@@ -1290,99 +1299,211 @@ class OverviewRenderer {
             `;
         };
 
-        overlay.innerHTML = `
-            <div class="dialog-content" style="width:640px; max-width:92vw; max-height:85vh; display:flex; flex-direction:column; gap:0; padding:24px;">
-                <h3 style="margin:0 0 14px;">${escapeHtml(teacher.name)} の担当授業</h3>
-
-                <div style="font-size:0.78em; color:#888; margin-bottom:4px;">① 教科</div>
-                <div id="asgn-cat-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:12px; border-bottom:1px solid #e5e7eb;">
-                    ${renderCategoryTags()}
-                </div>
-
-                <div style="font-size:0.78em; color:#888; margin:10px 0 4px;">② 科目</div>
-                <div id="asgn-subject-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:12px; border-bottom:1px solid #e5e7eb; min-height:36px;">
-                    ${renderSubjectTags()}
-                </div>
-
-                <div style="font-size:0.78em; color:#888; margin:10px 0 4px;">③ クラス（クリックで担当ON/OFF）</div>
-                <div id="asgn-class-area" style="min-height:60px; padding-bottom:12px; border-bottom:1px solid #e5e7eb;">
-                    ${renderClassPanel()}
-                </div>
-
-                <div style="padding-top:14px; text-align:right;">
-                    <button class="btn btn-secondary" id="btn-close-asgn-modal">閉じる</button>
-                </div>
+        const renderAssignmentTab = () => `
+            <div style="font-size:0.78em; color:#888; margin-bottom:4px;">① 教科</div>
+            <div id="asgn-cat-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:12px; border-bottom:1px solid #e5e7eb;">
+                ${renderCategoryTags()}
+            </div>
+            <div style="font-size:0.78em; color:#888; margin:10px 0 4px;">② 科目</div>
+            <div id="asgn-subject-area" style="display:flex; flex-wrap:wrap; gap:6px; padding-bottom:12px; border-bottom:1px solid #e5e7eb; min-height:36px;">
+                ${renderSubjectTags()}
+            </div>
+            <div style="font-size:0.78em; color:#888; margin:10px 0 4px;">③ クラス（クリックで担当ON/OFF）</div>
+            <div id="asgn-class-area" style="min-height:60px; padding-bottom:12px;">
+                ${renderClassPanel()}
             </div>
         `;
-        document.body.appendChild(overlay);
 
-        const catArea     = overlay.querySelector('#asgn-cat-area');
-        const subjectArea = overlay.querySelector('#asgn-subject-area');
-        const classArea   = overlay.querySelector('#asgn-class-area');
+        // ─────────────────────────────────────
+        // タブ2: 勤務不可時間
+        // ─────────────────────────────────────
 
-        const redrawAll = () => {
-            catArea.innerHTML     = renderCategoryTags();
-            subjectArea.innerHTML = renderSubjectTags();
-            classArea.innerHTML   = renderClassPanel();
-            attachCatEvents();
-            attachSubjectEvents();
-            attachClassEvents();
+        const renderUnavailableGrid = () => {
+            let gridHtml = '<div id="asgn-unavail-grid" class="unavailable-settings-grid">';
+            // ヘッダー行
+            gridHtml += '<div class="unavailable-header"></div>';
+            DAYS.forEach((day, i) => {
+                gridHtml += `
+                    <div class="unavailable-header">
+                        ${day}
+                        <button class="asgn-bulk-toggle" data-type="day" data-index="${i}">↓</button>
+                    </div>`;
+            });
+            // データ行
+            for (let p = 0; p < PERIODS; p++) {
+                gridHtml += `
+                    <div class="unavailable-header">
+                        ${p + 1}
+                        <button class="asgn-bulk-toggle" data-type="period" data-index="${p}">→</button>
+                    </div>`;
+                DAYS.forEach((day, dayIndex) => {
+                    const isUnavailable = this.store.isUnavailable(teacherId, dayIndex, p);
+                    gridHtml += `
+                        <div class="unavailable-settings-cell ${isUnavailable ? 'selected' : ''}"
+                             data-day="${dayIndex}" data-period="${p}"
+                             onclick="this.classList.toggle('selected'); this.textContent = this.classList.contains('selected') ? '✕' : '';">
+                             ${isUnavailable ? '✕' : ''}
+                        </div>`;
+                });
+            }
+            gridHtml += '</div>';
+            return gridHtml;
         };
 
-        const attachCatEvents = () => {
-            catArea.querySelectorAll('.asgn-cat-tag').forEach(tag => {
-                tag.onclick = () => {
-                    selectedCategoryId = tag.dataset.catId;
-                    selectedSubjectId = null;  // 教科変更で科目選択リセット
-                    redrawAll();
+        const renderUnavailableTab = () => `
+            <p style="font-size:0.82em; color:#6b7280; margin:0 0 10px;">クリックして勤務不可（✕）を設定し、最後に「保存」してください。</p>
+            ${renderUnavailableGrid()}
+            <div style="padding-top:14px; display:flex; justify-content:flex-end; gap:8px;">
+                <button class="btn btn-secondary" id="asgn-close-btn">閉じる</button>
+                <button class="btn btn-primary" id="asgn-save-unavail-btn">保存</button>
+            </div>
+        `;
+
+        // ─────────────────────────────────────
+        // モーダル描画
+        // ─────────────────────────────────────
+
+        const renderModal = () => {
+            const tabContent = activeTab === 'assignment' ? renderAssignmentTab() : renderUnavailableTab();
+            overlay.innerHTML = `
+                <div class="dialog-content" style="width:640px; max-width:92vw; max-height:88vh; display:flex; flex-direction:column; padding:24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h3 style="margin:0; font-size:1.05em; font-weight:700;">${escapeHtml(teacher.name)}</h3>
+                        <button id="asgn-close-x" style="background:none; border:none; font-size:1.3em; color:#9ca3af; cursor:pointer; line-height:1;">✕</button>
+                    </div>
+                    ${renderTabs()}
+                    <div id="asgn-tab-content" style="flex:1; overflow-y:auto;">
+                        ${tabContent}
+                    </div>
+                    ${activeTab === 'assignment' ? `<div style="padding-top:14px; text-align:right; border-top:1px solid #f3f4f6;"><button class="btn btn-secondary" id="asgn-close-btn">閉じる</button></div>` : ''}
+                </div>
+            `;
+
+            // タブ切替
+            overlay.querySelectorAll('.asgn-tab-btn').forEach(btn => {
+                btn.onclick = () => {
+                    activeTab = btn.dataset.tab;
+                    renderModal();
                 };
             });
-        };
 
-        const attachSubjectEvents = () => {
-            subjectArea.querySelectorAll('.asgn-subject-tag').forEach(tag => {
-                tag.onclick = () => {
-                    selectedSubjectId = tag.dataset.subjectId === selectedSubjectId ? null : tag.dataset.subjectId;
+            overlay.querySelector('#asgn-close-x').onclick = () => overlay.remove();
+            overlay.querySelector('#asgn-close-btn')?.onclick = () => overlay.remove();
+            overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+            if (activeTab === 'assignment') {
+                const catArea     = overlay.querySelector('#asgn-cat-area');
+                const subjectArea = overlay.querySelector('#asgn-subject-area');
+                const classArea   = overlay.querySelector('#asgn-class-area');
+
+                const redrawAssignment = () => {
+                    catArea.innerHTML     = renderCategoryTags();
                     subjectArea.innerHTML = renderSubjectTags();
                     classArea.innerHTML   = renderClassPanel();
+                    attachCatEvents();
                     attachSubjectEvents();
                     attachClassEvents();
                 };
-            });
-        };
 
-        const attachClassEvents = () => {
-            classArea.querySelectorAll('.asgn-class-tag').forEach(tag => {
-                tag.onclick = () => {
-                    if (!selectedSubjectId) return;
-                    const classId = tag.dataset.classId;
-                    const sub = this.store.getSubject(selectedSubjectId);
-                    const existing = this.store.assignments.find(
-                        a => a.teacherId === teacherId && a.subjectId === selectedSubjectId && a.classId === classId
+                const attachCatEvents = () => {
+                    catArea.querySelectorAll('.asgn-cat-tag').forEach(tag => {
+                        tag.onclick = () => {
+                            selectedCategoryId = tag.dataset.catId;
+                            selectedSubjectId = null;
+                            redrawAssignment();
+                        };
+                    });
+                };
+
+                const attachSubjectEvents = () => {
+                    subjectArea.querySelectorAll('.asgn-subject-tag').forEach(tag => {
+                        tag.onclick = () => {
+                            selectedSubjectId = tag.dataset.subjectId === selectedSubjectId ? null : tag.dataset.subjectId;
+                            subjectArea.innerHTML = renderSubjectTags();
+                            classArea.innerHTML   = renderClassPanel();
+                            attachSubjectEvents();
+                            attachClassEvents();
+                        };
+                    });
+                };
+
+                const attachClassEvents = () => {
+                    classArea.querySelectorAll('.asgn-class-tag').forEach(tag => {
+                        tag.onclick = () => {
+                            if (!selectedSubjectId) return;
+                            const classId = tag.dataset.classId;
+                            const sub = this.store.getSubject(selectedSubjectId);
+                            const existing = this.store.assignments.find(
+                                a => a.teacherId === teacherId && a.subjectId === selectedSubjectId && a.classId === classId
+                            );
+                            if (existing) {
+                                this.store.deleteAssignment(teacherId, selectedSubjectId, classId);
+                                showToast('担当を削除しました', 'success');
+                            } else {
+                                const wh = sub ? (sub.credits || 1) : 1;
+                                this.store.addAssignment(teacherId, selectedSubjectId, classId, wh);
+                                showToast('担当を登録しました', 'success');
+                            }
+                            subjectArea.innerHTML = renderSubjectTags();
+                            classArea.innerHTML   = renderClassPanel();
+                            attachSubjectEvents();
+                            attachClassEvents();
+                            this.render();
+                        };
+                    });
+                };
+
+                attachCatEvents();
+                attachSubjectEvents();
+                attachClassEvents();
+            }
+
+            if (activeTab === 'unavailable') {
+                // 一括トグルボタン
+                overlay.querySelectorAll('.asgn-bulk-toggle').forEach(btn => {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        const type = btn.dataset.type;
+                        const index = parseInt(btn.dataset.index);
+                        const grid = overlay.querySelector('#asgn-unavail-grid');
+                        const cells = type === 'day'
+                            ? grid.querySelectorAll(`.unavailable-settings-cell[data-day="${index}"]`)
+                            : grid.querySelectorAll(`.unavailable-settings-cell[data-period="${index}"]`);
+                        const allSelected = Array.from(cells).every(c => c.classList.contains('selected'));
+                        cells.forEach(c => {
+                            if (allSelected) { c.classList.remove('selected'); c.textContent = ''; }
+                            else { c.classList.add('selected'); c.textContent = '✕'; }
+                        });
+                    };
+                });
+
+                // 保存ボタン
+                overlay.querySelector('#asgn-save-unavail-btn').onclick = () => {
+                    const grid = overlay.querySelector('#asgn-unavail-grid');
+                    const cells = grid.querySelectorAll('.unavailable-settings-cell.selected');
+                    this.store.settings.unavailableSlots[teacherId] = [];
+                    cells.forEach(cell => {
+                        const d = parseInt(cell.dataset.day);
+                        const p = parseInt(cell.dataset.period);
+                        const key = `${d}-${p}`;
+                        if (!this.store.settings.unavailableSlots[teacherId].includes(key)) {
+                            this.store.settings.unavailableSlots[teacherId].push(key);
+                        }
+                    });
+                    this.store.saveToStorage();
+                    this.store.saveSettings(
+                        this.store.settings.periods,
+                        this.store.settings.classConfig,
+                        this.store.settings.unavailableSlots
                     );
-                    if (existing) {
-                        this.store.deleteAssignment(teacherId, selectedSubjectId, classId);
-                        showToast('担当を削除しました', 'success');
-                    } else {
-                        const wh = sub ? (sub.credits || 1) : 1;
-                        this.store.addAssignment(teacherId, selectedSubjectId, classId, wh);
-                        showToast('担当を登録しました', 'success');
-                    }
-                    subjectArea.innerHTML = renderSubjectTags();
-                    classArea.innerHTML   = renderClassPanel();
-                    attachSubjectEvents();
-                    attachClassEvents();
+                    showToast('勤務不可設定を保存しました', 'success');
                     this.render();
                 };
-            });
+            }
         };
 
-        attachCatEvents();
-        attachSubjectEvents();
-        attachClassEvents();
-
-        overlay.querySelector('#btn-close-asgn-modal').onclick = () => overlay.remove();
-        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        renderModal();
+        document.body.appendChild(overlay);
     }
 
     /**

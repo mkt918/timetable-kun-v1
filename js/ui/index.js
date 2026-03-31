@@ -158,9 +158,13 @@ class TimetableUI {
         this.lessonModal.openClassAddModal(classId, day, period);
     }
 
-    // Unavailable Settings Facade
+    // Unavailable Settings Facade（全教員タブからは統合モーダルの勤務不可タブを開く）
     openUnavailableSettingsModal(teacherId) {
-        this.unavailableSettings.open(teacherId);
+        if (this.overview && this.overview.openTeacherAssignmentModal) {
+            this.overview.openTeacherAssignmentModal(teacherId, 'unavailable');
+        } else {
+            this.unavailableSettings.open(teacherId);
+        }
     }
 
     // 担当授業管理モーダル Facade
