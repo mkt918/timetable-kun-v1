@@ -1715,7 +1715,7 @@ class DataStore {
                                 classId: cls.id,
                                 className: cls.name,
                                 subjectId: slot.subjectId,
-                                subjectName: subject?.shortName || '',
+                                subjectName: subject?.shortName || subject?.name || '',
                                 teacherIds: slot.teacherIds,
                                 isTT: slot.teacherIds.length > 1,
                                 specialClassroomIds: slot.specialClassroomIds || (slot.specialClassroomId ? [slot.specialClassroomId] : null)
