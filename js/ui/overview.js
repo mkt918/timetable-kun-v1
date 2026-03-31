@@ -1282,6 +1282,13 @@ class OverviewRenderer {
             } else if (sub.grade) {
                 filteredClasses = CLASSES.filter(c => String(c.grade) === String(sub.grade));
             }
+            // 開設授業マスタに登録されているクラスのみ表示
+            const openedClassIds = new Set(
+                this.store.classCurriculum
+                    .filter(cc => cc.subjectId === selectedSubjectId)
+                    .map(cc => cc.classId)
+            );
+            filteredClasses = filteredClasses.filter(c => openedClassIds.has(c.id));
             const assignedClassIds = new Set(
                 this.store.assignments.filter(a => a.teacherId === teacherId && a.subjectId === selectedSubjectId).map(a => a.classId)
             );
