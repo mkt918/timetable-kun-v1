@@ -893,20 +893,21 @@ class LessonManager {
         const modal = document.getElementById('modal-lesson-select');
         const infoContainer = document.getElementById('lesson-select-info');
         const listContainer = document.getElementById('lesson-select-list');
+        const btnDelete = document.getElementById('btn-clear-lesson');
 
         this.selectedSlot = { classId, day, period };
+        if (btnDelete) btnDelete.classList.add('hidden');
 
         const className = CLASSES.find(c => c.id === classId)?.name || classId;
         const currentSlots = this.store.getSlot(classId, day, period);
 
         // クラス別カリキュラムに登録済みの授業のみ表示
-        const classAssignments = this.store.assignments.filter(a =>
+        const assignments = this.store.assignments.filter(a =>
             a.classId === classId &&
             this.store.classCurriculum.some(cc => cc.classId === a.classId && cc.subjectId === a.subjectId)
         );
-        const teacherIds = [...new Set(classAssignments.map(a => a.teacherId))];
 
-        if (teacherIds.length === 0) {
+        if (assignments.length === 0) {
             infoContainer.innerHTML = `<div><strong>${escapeHtml(className)}</strong> - ${DAYS[day]}曜 ${period + 1}限</div>`;
             listContainer.innerHTML = `
                 <p class="placeholder-text">このクラスを担当する教員がいません。</p>
@@ -917,7 +918,7 @@ class LessonManager {
             return;
         }
 
-        // 特別教室選択用UI
+        // 特別教室選択用UI（アコーディオン形式）
         const rooms = this.store.specialClassrooms || [];
         let currentRoomIds = [];
         if (currentSlots && currentSlots.length > 0) {
@@ -936,10 +937,14 @@ class LessonManager {
             </label>
         `).join('');
 
+        const hasRoomSelected = currentRoomIds.length > 0;
         const roomSelectHtml = `
             <div style="margin-top: 5px; margin-bottom: 5px;">
-                <label style="font-size: 0.9em; color: #666;">使用教室: </label>
-                <div id="room-checkboxes" style="display: inline-block;">
+                <div id="room-accordion-toggle" style="cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 0.9em; color: #555; user-select: none;">
+                    <span id="room-accordion-arrow" style="font-size: 0.8em;">${hasRoomSelected ? '▼' : '▶'}</span>
+                    <span>使用教室${hasRoomSelected ? `（${currentRoomIds.length}件選択中）` : ''}</span>
+                </div>
+                <div id="room-accordion-body" style="display: ${hasRoomSelected ? 'block' : 'none'}; margin-top: 4px; padding: 6px 8px; background: #f8f8f8; border-radius: 4px;">
                     ${rooms.length > 0 ? roomCheckboxesHtml : '<span style="color: #999;">(教室未登録)</span>'}
                 </div>
             </div>
@@ -947,56 +952,122 @@ class LessonManager {
 
         infoContainer.innerHTML = `<div><strong>${escapeHtml(className)}</strong> - ${DAYS[day]}曜 ${period + 1}限に授業を追加</div>` + roomSelectHtml;
 
-        // 担当授業リスト（教員ごと）
-        let checkboxListHtml = '';
-        teacherIds.forEach(teacherId => {
-            const teacher = this.store.getTeacher(teacherId);
-            const teacherName = teacher ? teacher.name : '不明';
-            const teacherAssignments = classAssignments.filter(a => a.teacherId === teacherId);
+        // アコーディオンのトグル処理
+        const toggle = document.getElementById('room-accordion-toggle');
+        if (toggle) {
+            toggle.onclick = () => {
+                const body = document.getElementById('room-accordion-body');
+                const arrow = document.getElementById('room-accordion-arrow');
+                const isOpen = body.style.display !== 'none';
+                body.style.display = isOpen ? 'none' : 'block';
+                arrow.textContent = isOpen ? '▶' : '▼';
+            };
+        }
 
-            teacherAssignments.forEach(lesson => {
-                const subject = this.store.getSubject(lesson.subjectId);
-                const placedCount = this.store.countPlacedHours(teacherId, lesson.subjectId, classId);
-                const totalHours = lesson.weeklyHours;
-                const remaining = totalHours - placedCount;
-                const isCompleted = remaining <= 0;
-                let hoursText = `残${remaining}/${totalHours}`;
-                if (remaining <= 0) hoursText = `✓${hoursText}`;
+        // 科目名 → 教員名順でソート
+        const sortedAssignments = [...assignments].sort((a, b) => {
+            const subA = this.store.getSubject(a.subjectId)?.name || '';
+            const subB = this.store.getSubject(b.subjectId)?.name || '';
+            if (subA !== subB) return subA.localeCompare(subB, 'ja');
+            const tA = this.store.getTeacher(a.teacherId)?.name || '';
+            const tB = this.store.getTeacher(b.teacherId)?.name || '';
+            return tA.localeCompare(tB, 'ja');
+        });
 
-                // この授業が現在のスロットに配置されているかチェック
-                const isPlaced = currentSlots.some(slot =>
-                    slot.subjectId === lesson.subjectId &&
-                    slot.teacherIds.includes(teacherId)
-                );
-                const placedBadge = isPlaced ? ' <span style="color: #4CAF50; font-size: 0.8em;">[配置済み]</span>' : '';
+        const checkboxListHtml = sortedAssignments.map(lesson => {
+            const subject = this.store.getSubject(lesson.subjectId);
+            const teacher = this.store.getTeacher(lesson.teacherId);
+            const teacherId = lesson.teacherId;
 
-                checkboxListHtml += `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : 'white'};">
-                        <input type="checkbox" class="lesson-checkbox" 
+            const placedCount = this.store.countPlacedHours(teacherId, lesson.subjectId, classId);
+            const totalHours = lesson.weeklyHours;
+            const remaining = totalHours - placedCount;
+            const isCompleted = remaining <= 0;
+            let hoursText = `残${remaining}/${totalHours}`;
+            if (remaining <= 0) hoursText = `✓${hoursText}`;
+
+            // 配置済みスロットの曜日+時限テキストを収集
+            const placedSlotLabels = [];
+            for (let d = 0; d < DAYS.length; d++) {
+                for (let p = 0; p < PERIODS; p++) {
+                    const slots = this.store.getSlot(classId, d, p);
+                    if (slots.some(s => s.subjectId === lesson.subjectId && s.teacherIds && s.teacherIds.includes(teacherId))) {
+                        placedSlotLabels.push(`${DAYS[d]}${p + 1}`);
+                    }
+                }
+            }
+            const placedSlotText = placedSlotLabels.length > 0
+                ? `<span style="font-size:0.75em; color:#6b7280; margin-left:4px;">${placedSlotLabels.join('・')}</span>`
+                : '';
+
+            // この授業が現在のスロットに配置されているかチェック
+            const isPlaced = currentSlots.some(slot =>
+                slot.subjectId === lesson.subjectId &&
+                slot.teacherIds.includes(teacherId)
+            );
+
+            // 教員がこの時限に別のクラスで授業を持っているかチェック
+            const teacherTimetable = this.store.getTeacherTimetable(teacherId);
+            const teacherKey = `${day}-${period}`;
+            const teacherSlotsAtPeriod = teacherTimetable[teacherKey] || [];
+            const blockingTeacherSlot = teacherSlotsAtPeriod.find(s => s.classId !== classId);
+            const blockingTeacherClass = blockingTeacherSlot
+                ? CLASSES.find(c => c.id === blockingTeacherSlot.classId)?.name || blockingTeacherSlot.classId
+                : null;
+
+            // このクラスに既に別の授業が入っているかチェック
+            const classSlots = this.store.getSlot(classId, day, period);
+            const blockingClassSlot = classSlots.find(s =>
+                !(s.subjectId === lesson.subjectId && s.teacherIds && s.teacherIds.includes(teacherId))
+            );
+            const blockingClassName = blockingClassSlot
+                ? this.store.getSubject(blockingClassSlot.subjectId)?.name || '他の授業'
+                : null;
+
+            const isBlocked = !!(blockingTeacherClass || blockingClassName);
+            const blockedReason = blockingTeacherClass
+                ? `⚠ 教員がこの時限に${escapeHtml(blockingTeacherClass)}の授業を担当しています`
+                : blockingClassName
+                    ? `⚠ この時限は「${escapeHtml(blockingClassName)}」が入っています`
+                    : '';
+            const blockedText = isBlocked
+                ? `<div style="padding-left:20px; font-size:0.75em; color:#dc2626;">${blockedReason}</div>`
+                : '';
+
+            return `
+                <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: ${isBlocked ? 'default' : 'pointer'}; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'}; opacity: ${isBlocked ? '0.75' : '1'};">
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <input type="checkbox" class="lesson-checkbox"
                                data-teacher-id="${teacherId}"
                                data-subject-id="${lesson.subjectId}"
                                ${isPlaced ? 'checked' : ''}
-                               style="margin-right: 8px;">
-                        <span class="lesson-subject" style="font-weight: 500;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
-                        <span style="margin-left: 8px; color: #666;">${escapeHtml(teacherName)}</span>${placedBadge}
-                        <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="float: right; font-size: 0.9em;">
-                            ${hoursText}
-                        </span>
-                    </label>
-                `;
-            });
-        });
+                               ${isBlocked ? 'disabled' : ''}
+                               style="flex-shrink:0;">
+                        <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
+                        <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(teacher?.name || '')}</span>
+                        <span class="lesson-hours ${isCompleted ? 'done' : ''}" style="margin-left:auto; font-size:0.82em; flex-shrink:0;">${hoursText}</span>
+                    </div>
+                    ${placedSlotText ? `<div style="padding-left:20px;">${placedSlotText}</div>` : ''}
+                    ${blockedText}
+                </label>
+            `;
+        }).join('');
 
         const hasExisting = currentSlots && currentSlots.length > 0;
 
         listContainer.innerHTML = `
-            <div style="max-height: 300px; overflow-y: auto; margin-bottom: 10px;">
+            <div style="max-height: 300px; overflow-y: auto; margin-bottom: 10px; display:grid; grid-template-columns:1fr 1fr; gap:3px 6px;">
                 ${checkboxListHtml}
             </div>
-            <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #ddd;">
-                <button id="btn-delete-lesson-class" class="btn btn-danger" style="${hasExisting ? '' : 'visibility: hidden;'}">
-                    <span class="btn-icon">🗑️</span>この授業を削除
-                </button>
+            <div style="display: flex; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid #ddd;">
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-delete-lesson-class" class="btn btn-danger" style="${hasExisting ? '' : 'visibility: hidden;'}">
+                        <span class="btn-icon">🗑️</span>この授業を削除
+                    </button>
+                    <button id="btn-move-to-parking-class" class="btn btn-warning" style="${hasExisting ? '' : 'visibility: hidden;'}">
+                        <span class="btn-icon">🅿️</span>パーキングへ移動
+                    </button>
+                </div>
                 <button id="btn-register-lessons-class" class="btn btn-primary">登録</button>
             </div>
         `;
@@ -1015,60 +1086,119 @@ class LessonManager {
             };
         }
 
+        // パーキングへ移動ボタンのイベント
+        const parkingBtn = document.getElementById('btn-move-to-parking-class');
+        if (parkingBtn) {
+            parkingBtn.onclick = () => {
+                const slots = this.store.getSlot(classId, day, period);
+                if (!slots || slots.length === 0 || !slots[0].teacherIds || slots[0].teacherIds.length === 0) {
+                    showToast('教員が設定されていません', 'error');
+                    return;
+                }
+                const tid = slots[0].teacherIds[0];
+                const result = this.store.moveToParking(tid, classId, day, period);
+                if (result.success) {
+                    this.close();
+                    this.ui.renderMainOverview();
+                    this.ui.parkingArea.render();
+                    showToast('パーキングエリアに移動しました', 'success');
+                } else {
+                    showToast(result.message || 'パーキングへの移動に失敗しました', 'error');
+                }
+            };
+        }
+
+        // 授業チェックボックス変更時：デフォルト教室を反映
+        const applyDefaultRooms = () => {
+            if (currentSlots.length > 0) return;
+            const checkedBoxes = Array.from(document.querySelectorAll('.lesson-checkbox:checked'));
+            if (checkedBoxes.length === 0) return;
+            const first = checkedBoxes[0];
+            const ccEntry = this.store.classCurriculum.find(
+                c => c.classId === classId && c.subjectId === first.dataset.subjectId
+            );
+            if (!ccEntry || !ccEntry.defaultRoomIds || ccEntry.defaultRoomIds.length === 0) return;
+            const roomCheckboxes = Array.from(document.querySelectorAll('.room-checkbox:checked'));
+            if (roomCheckboxes.length === 0) {
+                ccEntry.defaultRoomIds.forEach(rid => {
+                    const cb = document.querySelector(`.room-checkbox[value="${rid}"]`);
+                    if (cb) cb.checked = true;
+                });
+                const body = document.getElementById('room-accordion-body');
+                const arrow = document.getElementById('room-accordion-arrow');
+                if (body) body.style.display = 'block';
+                if (arrow) arrow.textContent = '▼';
+            }
+        };
+
         // 登録ボタンのイベント
         const registerBtn = document.getElementById('btn-register-lessons-class');
         if (registerBtn) {
             registerBtn.onclick = () => {
                 const selectedCheckboxes = Array.from(document.querySelectorAll('.lesson-checkbox:checked'));
-
-                // 何も選択されていない場合は閉じるだけ
-                if (selectedCheckboxes.length === 0) {
-                    this.store.clearSlot(classId, day, period);
-                    this.close();
-                    this.ui.renderMainOverview();
-                    this.ui.checkConflicts();
-                    showToast('授業を削除しました', 'success');
-                    return;
-                }
-
-                // 特別教室IDs取得
-                const selectedRooms = Array.from(document.querySelectorAll('.room-checkbox:checked')).map(cb => cb.value);
-                const specialClassroomIds = selectedRooms.length > 0 ? selectedRooms : null;
-
-                // 選択された授業を登録（合同・TT展開のため placeWithConstraints を使用）
-                let registeredCount = 0;
-
-                // 科目ごとにグループ化（同一科目の複数教員をまとめて処理）
-                const subjectTeacherMap = {};
-                selectedCheckboxes.forEach(cb => {
-                    const tid = cb.dataset.teacherId;
-                    const sid = cb.dataset.subjectId;
-                    if (!subjectTeacherMap[sid]) subjectTeacherMap[sid] = [];
-                    if (!subjectTeacherMap[sid].includes(tid)) subjectTeacherMap[sid].push(tid);
-                });
-
-                Object.entries(subjectTeacherMap).forEach(([subjectId, teacherIds]) => {
-                    // TT教員を自動解決してから配置
-                    const resolvedTeacherIds = this._resolveTtTeacherIds(classId, subjectId, teacherIds);
-                    const result = this.store.placeWithConstraints(
-                        classId, day, period, subjectId, resolvedTeacherIds, specialClassroomIds
-                    );
-                    if (result.success || result.placed > 0) registeredCount++;
-                });
-
-                this.close();
-                this.ui.renderMainOverview();
-                this.ui.checkConflicts();
-
-                if (registeredCount > 0) {
-                    showToast(`${registeredCount}件の授業を登録しました`, 'success');
-                } else {
-                    showToast('既に全て登録済みです', 'info');
-                }
+                this.registerMultipleLessonsForClass(classId, day, period, selectedCheckboxes);
             };
         }
 
+        listContainer.querySelectorAll('.lesson-checkbox').forEach(cb => {
+            cb.addEventListener('change', applyDefaultRooms);
+        });
+
         modal.querySelector('.modal-close').onclick = () => this.close();
         modal.classList.remove('hidden');
+    }
+
+    registerMultipleLessonsForClass(classId, day, period, selectedCheckboxes) {
+        // 特別教室IDs取得
+        const selectedRooms = Array.from(document.querySelectorAll('.room-checkbox:checked')).map(cb => cb.value);
+        const specialClassroomIds = selectedRooms.length > 0 ? selectedRooms : null;
+
+        // チェックが外れた授業を削除
+        const currentSlots = this.store.getSlot(classId, day, period);
+        const selectedKeys = new Set(selectedCheckboxes.map(cb => `${cb.dataset.subjectId}__${cb.dataset.teacherId}`));
+        currentSlots.forEach(slot => {
+            const key = `${slot.subjectId}__${slot.teacherIds[0]}`;
+            if (!selectedKeys.has(key)) {
+                this.store.clearSlot(classId, day, period);
+            }
+        });
+
+        if (selectedCheckboxes.length === 0) {
+            this.close();
+            this.ui.renderMainOverview();
+            this.ui.checkConflicts();
+            showToast('授業を削除しました', 'success');
+            return;
+        }
+
+        this.store.snapshot();
+        this.ui.updateUndoRedoButtons();
+
+        let registeredCount = 0;
+        const subjectTeacherMap = {};
+        selectedCheckboxes.forEach(cb => {
+            const tid = cb.dataset.teacherId;
+            const sid = cb.dataset.subjectId;
+            if (!subjectTeacherMap[sid]) subjectTeacherMap[sid] = [];
+            if (!subjectTeacherMap[sid].includes(tid)) subjectTeacherMap[sid].push(tid);
+        });
+
+        Object.entries(subjectTeacherMap).forEach(([subjectId, teacherIds]) => {
+            const resolvedTeacherIds = this._resolveTtTeacherIds(classId, subjectId, teacherIds);
+            const result = this.store.placeWithConstraints(
+                classId, day, period, subjectId, resolvedTeacherIds, specialClassroomIds
+            );
+            if (result.success || result.placed > 0) registeredCount++;
+        });
+
+        this.close();
+        this.ui.renderMainOverview();
+        this.ui.checkConflicts();
+
+        if (registeredCount > 0) {
+            showToast(`${registeredCount}件の授業を登録しました`, 'success');
+        } else {
+            showToast('既に全て登録済みです', 'info');
+        }
     }
 }
