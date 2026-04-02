@@ -138,13 +138,14 @@ class LessonManager {
                     : '';
 
                 return `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: ${isBlocked ? 'default' : 'pointer'}; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'}; opacity: ${isBlocked ? '0.75' : '1'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'};">
                         <div style="display:flex; align-items:center; gap:4px;">
                             <input type="checkbox" class="lesson-checkbox"
                                    data-class-id="${lesson.classId}"
                                    data-subject-id="${lesson.subjectId}"
+                                   data-blocking-class-id="${escapeHtml(lesson.classId)}"
+                                   data-blocking-subject-id="${blockingSlot ? escapeHtml(blockingSlot.subjectId) : ''}"
                                    ${isPlaced ? 'checked' : ''}
-                                   ${isBlocked ? 'disabled' : ''}
                                    style="flex-shrink:0;">
                             <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
                             <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(className)}</span>
@@ -333,14 +334,14 @@ class LessonManager {
                     : '';
 
                 return `
-                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: ${isBlocked ? 'default' : 'pointer'}; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'}; opacity: ${isBlocked ? '0.75' : '1'};">
+                    <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'};">
                         <div style="display:flex; align-items:center; gap:4px;">
                             <input type="checkbox" class="lesson-checkbox"
                                    data-class-id="${lesson.classId}"
                                    data-subject-id="${lesson.subjectId}"
                                    data-teacher-id="${lesson.teacherId}"
+                                   data-blocking-subject-id="${blockingSlot ? escapeHtml(blockingSlot.subjectId) : ''}"
                                    ${isPlaced ? 'checked' : ''}
-                                   ${isBlocked ? 'disabled' : ''}
                                    style="flex-shrink:0;">
                             <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
                             <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(teacher?.name || '')}</span>
@@ -1035,13 +1036,13 @@ class LessonManager {
                 : '';
 
             return `
-                <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: ${isBlocked ? 'default' : 'pointer'}; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'}; opacity: ${isBlocked ? '0.75' : '1'};">
+                <label class="lesson-checkbox-item ${isCompleted ? 'completed' : ''}" style="display: block; padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: ${isPlaced ? '#f0f8f0' : isBlocked ? '#f3f4f6' : 'white'};">
                     <div style="display:flex; align-items:center; gap:4px;">
                         <input type="checkbox" class="lesson-checkbox"
                                data-teacher-id="${teacherId}"
                                data-subject-id="${lesson.subjectId}"
+                               data-blocking-subject-id="${blockingClassSlot ? escapeHtml(blockingClassSlot.subjectId) : ''}"
                                ${isPlaced ? 'checked' : ''}
-                               ${isBlocked ? 'disabled' : ''}
                                style="flex-shrink:0;">
                         <span class="lesson-subject" style="font-weight:500; font-size:0.9em;">${escapeHtml(subject?.shortName || subject?.name || lesson.subjectId)}</span>
                         <span class="lesson-class" style="color:#666; font-size:0.85em;">${escapeHtml(teacher?.name || '')}</span>
@@ -1153,10 +1154,53 @@ class LessonManager {
         const selectedRooms = Array.from(document.querySelectorAll('.room-checkbox:checked')).map(cb => cb.value);
         const specialClassroomIds = selectedRooms.length > 0 ? selectedRooms : null;
 
-        // チェックが外れた授業を削除
+        const dayName = DAYS[day];
+        const periodNum = period + 1;
+        const cls = CLASSES.find(c => c.id === classId);
+        const className = cls ? cls.name : '不明';
+
+        // blocking な授業（他の授業が入っている時限）がチェックされている場合、先に確認
         const currentSlots = this.store.getSlot(classId, day, period);
+        for (const cb of selectedCheckboxes) {
+            const blockingSubjectId = cb.dataset.blockingSubjectId;
+            if (!blockingSubjectId) continue;
+            const blockingSlot = currentSlots.find(s => s.subjectId === blockingSubjectId);
+            if (!blockingSlot) continue;
+
+            const blockingSubject = this.store.getSubject(blockingSubjectId);
+            const blockingSubjectName = blockingSubject ? blockingSubject.name : '不明な科目';
+            const blockingTeacherNames = (blockingSlot.teacherIds || []).map(tid => {
+                const t = this.store.getTeacher(tid);
+                return t ? t.name : '不明';
+            }).join('・');
+            const newSubject = this.store.getSubject(cb.dataset.subjectId);
+            const newSubjectName = newSubject ? newSubject.name : '不明な科目';
+            const newTeacher = this.store.getTeacher(cb.dataset.teacherId);
+            const newTeacherName = newTeacher ? newTeacher.name : '不明';
+
+            const message = `【授業の競合】\n\n` +
+                `クラス: ${className}\n` +
+                `時限: ${dayName}${periodNum}限\n\n` +
+                `既に配置されている授業:\n` +
+                `  科目: ${blockingSubjectName}\n` +
+                `  担当: ${blockingTeacherNames}\n\n` +
+                `新しく配置する授業:\n` +
+                `  科目: ${newSubjectName}\n` +
+                `  担当: ${newTeacherName}\n\n` +
+                `既存の授業（TT・合同含む）を削除して新しい授業を配置しますか？`;
+
+            if (!confirm(message)) {
+                return; // キャンセル → 登録全体を中断
+            }
+            // 確認OK → 既存授業を削除（TT・合同含め clearSlot で一括削除）
+            this.store.clearSlot(classId, day, period);
+            break; // 削除は1回でよい（同一時限の全スロットが消える）
+        }
+
+        // チェックが外れた授業を削除（既存配置のうち選択されていないものを削除）
+        const remainingSlots = this.store.getSlot(classId, day, period);
         const selectedKeys = new Set(selectedCheckboxes.map(cb => `${cb.dataset.subjectId}__${cb.dataset.teacherId}`));
-        currentSlots.forEach(slot => {
+        remainingSlots.forEach(slot => {
             const key = `${slot.subjectId}__${slot.teacherIds[0]}`;
             if (!selectedKeys.has(key)) {
                 this.store.clearSlot(classId, day, period);
