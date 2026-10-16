@@ -40,9 +40,12 @@
 npm install
 npm run dev      # 開発サーバー
 npm test         # テスト
-npm run build    # dist/ に出力
+npm run build    # site/ に出力
 ```
 
 - React + TypeScript + Vite。ロジックは `src/core/`（画面に依存しない純粋関数とテスト）、画面は `src/ui/`
-- `main` ブランチへの push で GitHub Pages に自動公開されます（リポジトリの Settings → Pages → Source を「GitHub Actions」にしてください）
+- 開発用の入口は `app/index.html`、ビルド結果は `site/` に出力され、リポジトリに含めて公開します
+  - 公開URL: https://mkt918.github.io/timetable-kun-v1/ （`site/` へ転送されます）
+  - `main` への push で、CI が `site/` を再ビルドしてコミットし、GitHub Pages に公開します
+  - Pages の設定が「ブランチから公開」「GitHub Actions から公開」のどちらでも動きます
 - v1 のコードは `legacy/` に残しています
