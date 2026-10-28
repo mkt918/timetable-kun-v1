@@ -309,17 +309,19 @@ td.slot.blocked, td.m-cell.blocked { background: repeating-linear-gradient(45deg
 /* ---------- 全体一覧 ---------- */
 .matrix-wrap { overflow: auto; max-height: calc(100vh - 180px); border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); }
 .matrix { border-collapse: separate; border-spacing: 0; font-size: 11px; }
-.matrix th { background: var(--surface-2); font-weight: 500; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--line); }
-.matrix thead tr:nth-child(2) th { top: 25px; }
-.matrix th.m-day { border-left: 2px solid var(--line-strong); padding: 3px; font-weight: 700; }
-.matrix th.m-p { min-width: 54px; color: var(--muted); padding: 2px; }
-.matrix th.m-name { position: sticky; left: 0; z-index: 3; text-align: left; padding: 3px 8px; min-width: 84px; white-space: nowrap; border-right: 1px solid var(--line-strong); }
-.matrix tbody th.m-name { z-index: 1; background: var(--surface); font-weight: 500; font-size: 12px; }
-.matrix td.m-cell { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); height: 38px; padding: 1px; vertical-align: top; width: 54px; max-width: 54px; }
-.matrix .day-start { border-left: 2px solid var(--line-strong) !important; }
-.matrix tr.involved th.m-name { background: var(--primary-soft); }
-.matrix tr.involved td.m-cell.can { background: var(--ok-soft); cursor: pointer; box-shadow: inset 0 0 0 2px #4ade80; }
-.matrix tr.involved td.m-cell.cannot { background: #f1f5f9; }
+.matrix thead th { background: var(--surface-2); font-weight: 500; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--line-strong); border-right: 1px solid var(--line); padding: 3px 4px; }
+.matrix th.m-corner { left: 0; z-index: 4; min-width: 56px; }
+.matrix th.m-name { min-width: 64px; max-width: 64px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.matrix th.m-name .link { font-weight: 500; }
+.matrix .m-rem { font-size: 10px; }
+.matrix tbody th { position: sticky; background: var(--surface); z-index: 1; border-bottom: 1px solid var(--line); }
+.matrix tbody th.m-day { left: 0; width: 28px; min-width: 28px; font-weight: 700; font-size: 13px; border-right: 1px solid var(--line); vertical-align: middle; }
+.matrix tbody th.m-p { left: 28px; width: 28px; min-width: 28px; color: var(--muted); border-right: 1px solid var(--line-strong); }
+.matrix td.m-cell { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); height: 38px; padding: 1px; vertical-align: top; width: 64px; max-width: 64px; }
+.matrix tr.day-start > * { border-top: 2px solid var(--line-strong); }
+.matrix th.m-name.involved { background: var(--primary-soft); }
+.matrix td.m-cell.involved.can { background: var(--ok-soft); cursor: pointer; box-shadow: inset 0 0 0 2px #4ade80; }
+.matrix td.m-cell.involved.cannot { background: #f1f5f9; }
 .matrix td.m-cell .occ { height: 100%; }
 
 /* ---------- チェック ---------- */
@@ -350,6 +352,9 @@ td.slot.blocked, td.m-cell.blocked { background: repeating-linear-gradient(45deg
 .print-page.per-4 .occ-sub { font-size: 9px; }
 .matrix-wrap.print { max-height: none; overflow: visible; border: 0; }
 .matrix-wrap.print .matrix th { position: static; }
+.matrix-wrap.print .matrix { width: 100%; table-layout: fixed; }
+.matrix-wrap.print .matrix th.m-corner { width: 44px; }
+.matrix-wrap.print .matrix .occ-sub { overflow: hidden; text-overflow: ellipsis; }
 
 @media print {
   @page { size: A4 portrait; margin: 0; }
@@ -362,9 +367,9 @@ td.slot.blocked, td.m-cell.blocked { background: repeating-linear-gradient(45deg
   .print-area.landscape .print-page { padding: 8mm; }
   .occ { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   .matrix { font-size: 8px; }
-  .matrix th.m-p, .matrix td.m-cell { min-width: 0; width: auto; }
+  .matrix th.m-name, .matrix td.m-cell { min-width: 0; width: auto; max-width: none; }
 }
-@media print { .print-area.landscape { zoom: .62; } }
+
 .table .cell-select { max-width: 170px; }
 .group-occ { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 13%, white), color-mix(in srgb, var(--c) 13%, white) 8px, color-mix(in srgb, var(--c) 20%, white) 8px, color-mix(in srgb, var(--c) 20%, white) 16px); }
 .occ-sub { white-space: normal; }

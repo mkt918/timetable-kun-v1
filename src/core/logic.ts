@@ -159,7 +159,6 @@ function checkUnits(
     return reasons;
   }
   const ignore = new Set(units.map(u => u.from?.id).filter(Boolean) as string[]);
-  const movingIds = new Set(units.map(u => u.lesson.id));
   const groupId = units[0].lesson.groupId;
   const teacherById = new Map(data.teachers.map(t => [t.id, t]));
 
@@ -172,7 +171,6 @@ function checkUnits(
       const key = slotKey(day, period + i);
       const occ = (idx.occupancy.get(key) ?? []).filter(o => !ignore.has(o.placement.id));
       for (const o of occ) {
-        if (movingIds.has(o.lesson.id)) continue;
         const sameGroup = groupId && o.lesson.groupId === groupId;
         const label = nm.subjectName(o.lesson.subjectId);
         if (!sameGroup) {
