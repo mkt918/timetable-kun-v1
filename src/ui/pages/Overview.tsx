@@ -28,35 +28,38 @@ export function OverviewPage({ printMode = false, forceType }: { printMode?: boo
   const involved = (eid: string) => selLesson && mateLessons.some(l =>
     type === 'class' ? l.classIds.includes(eid) : type === 'teacher' ? l.teacherIds.includes(eid) : l.roomId === eid);
 
+  // 縦：曜日・時限（月1〜月6、火1…）、横：先生（クラス・教室）
+  const rem = new Map(entities.map(e => [e.id, lessonsFor(data, type, e.id).reduce((s, l) => s + remainingHours(idx, l), 0)]));
   const table = (
     <div className={`matrix-wrap ${printMode ? 'print' : ''}`}>
       <table className="matrix">
         <thead>
           <tr>
-            <th rowSpan={2} className="m-name">{type === 'class' ? 'クラス' : type === 'teacher' ? '先生' : '教室'}</th>
-            {days.map(d => <th key={d} colSpan={periods} className="m-day">{d}</th>)}
-            {!printMode && <th rowSpan={2}>未配置</th>}
+            <th colSpan={2} className="m-corner">{type === 'class' ? 'クラス' : type === 'teacher' ? '先生' : '教室'}</th>
+            {entities.map(e => (
+              <th key={e.id} className={`m-name ${involved(e.id) ? 'involved' : ''}`}>
+                {printMode ? e.name : <button className="link" onClick={() => { setView(type, e.id); setPage('edit'); }}>{e.name}</button>}
+                {!printMode && <div className={`m-rem ${rem.get(e.id) ? 'warn-text' : 'ok-text'}`} title="未配置コマ">{rem.get(e.id) ? `残${rem.get(e.id)}` : '✓'}</div>}
+              </th>
+            ))}
           </tr>
-          <tr>{days.flatMap((d, di) => Array.from({ length: periods }, (_, p) => <th key={`${d}${p}`} className={`m-p ${p === 0 && di > 0 ? 'day-start' : ''}`}>{p + 1}</th>))}</tr>
         </thead>
         <tbody>
-          {entities.map(e => {
-            const rem = lessonsFor(data, type, e.id).reduce((s, l) => s + remainingHours(idx, l), 0);
-            const inv = involved(e.id);
+          {days.flatMap((dayName, d) => Array.from({ length: periods }, (_, p) => {
+            const key = slotKey(d, p);
             return (
-              <tr key={e.id} className={inv ? 'involved' : ''}>
-                <th className="m-name">
-                  {printMode ? e.name : <button className="link" onClick={() => { setView(type, e.id); setPage('edit'); }}>{e.name}</button>}
-                </th>
-                {days.flatMap((_, d) => Array.from({ length: periods }, (_, p) => {
-                  const key = slotKey(d, p);
+              <tr key={key} className={p === 0 && d > 0 ? 'day-start' : ''}>
+                {p === 0 && <th rowSpan={periods} className="m-day">{dayName}</th>}
+                <th className="m-p">{p + 1}</th>
+                {entities.map(e => {
+                  const inv = involved(e.id);
                   const occ = occupantsFor(idx, type, e.id, d, p);
                   const r = inv ? targets?.get(key) : undefined;
                   const can = r && r.length === 0;
                   const blocked = blockedLabel(data, idx, type, e.id, key);
                   return (
-                    <td key={key}
-                      className={`m-cell ${p === 0 && d > 0 ? 'day-start' : ''} ${r ? (can ? 'can' : 'cannot') : ''} ${blocked && occ.length === 0 ? 'blocked' : ''}`}
+                    <td key={e.id}
+                      className={`m-cell ${inv ? 'involved' : ''} ${r ? (can ? 'can' : 'cannot') : ''} ${blocked && occ.length === 0 ? 'blocked' : ''}`}
                       title={r && !can ? r.map(x => x.message).join('\n') : blocked ?? undefined}
                       onClick={() => {
                         if (!selPl || !inv) return;
@@ -75,11 +78,10 @@ export function OverviewPage({ printMode = false, forceType }: { printMode?: boo
                       ))}
                     </td>
                   );
-                }))}
-                {!printMode && <td className={`num-cell ${rem ? 'warn-text' : 'ok-text'}`}>{rem || '✓'}</td>}
+                })}
               </tr>
             );
-          })}
+          }))}
         </tbody>
       </table>
     </div>
@@ -90,7 +92,7 @@ export function OverviewPage({ printMode = false, forceType }: { printMode?: boo
   return (
     <div className="page wide">
       <PageHead title="全体一覧"
-        desc="全員の時間割を1画面で確認できます。授業をクリックすると、動かせる枠（関係する行）が緑になります。名前をクリックするとその時間割の編集へ移ります。"
+        desc="全員の時間割を1画面で確認できます。縦が曜日・時限、横が先生です。授業をクリックすると、動かせる枠（関係する列）が緑になります。名前をクリックするとその時間割の編集へ移ります。"
         actions={
           <div className="seg">
             {(['teacher', 'class', 'room'] as ViewType[]).map(t => (

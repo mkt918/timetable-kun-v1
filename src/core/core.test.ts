@@ -58,6 +58,13 @@ describe('配置', () => {
     expect(checkPlace(d, buildIndex(d), 'L3', 1, 0, names(d)).map(x => x.kind)).toEqual(['full']);
   });
 
+  it('同じ授業の別のコマがある枠には置けない・動かせない', () => {
+    let d = tiny();
+    d = produce(d, x => { placeLesson(x, 'L1', 0, 0); placeLesson(x, 'L1', 0, 1); });
+    expect(checkPlace(d, buildIndex(d), 'L1', 0, 0, names(d)).length).toBeGreaterThan(0);
+    expect(checkMove(d, buildIndex(d), d.placements[1].id, 0, 0, names(d)).map(r => r.kind)).toContain('teacher');
+  });
+
   it('連続が最終時限を超える枠には置けない', () => {
     const d = tiny();
     expect(checkPlace(d, buildIndex(d), 'L3', 0, 3, names(d)).map(x => x.kind)).toContain('range');
